@@ -1,0 +1,27 @@
+# IDE files
+.idea/
+*.iml
+
+# Build directories
+target/
+
+# Other common ignores for Java/Maven projects
+*.class
+*.jar
+*.war
+*.ear
+*.nar
+*.zip
+*.tar.gz
+
+# Log files
+*.log
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Node modules
+node_modules/
+dist/
+.vscode/

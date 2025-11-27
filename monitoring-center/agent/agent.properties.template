@@ -1,0 +1,17 @@
+# Monitoring Agent Configuration File
+# Copy this file to the same directory as monitoring-agent.jar and modify as needed
+
+# Agent Configuration
+# Unique name for this agent (default: MonitoringAgent-<hostname>)
+agent.name=Server1-Agent
+
+# Port for agent (currently not used, reserved for future features)
+agent.port=8081
+
+# Backend Server Configuration
+# URL of the monitoring backend server
+backend.url=http://your-backend-server:8080
+
+# Metric Collection Configuration
+# How often to collect and send metrics (in seconds)
+metric.interval.seconds=10
