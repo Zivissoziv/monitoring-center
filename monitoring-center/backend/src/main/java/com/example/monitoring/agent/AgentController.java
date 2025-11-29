@@ -50,4 +50,32 @@ public class AgentController {
             return ResponseEntity.notFound().build();
         }
     }
+    
+    @PostMapping("/{id}/collect")
+    public ResponseEntity<String> collectMetrics(@PathVariable Long id) {
+        try {
+            agentService.collectMetricsFromAgent(id);
+            return ResponseEntity.ok("Metrics collection started for agent " + id);
+        } catch (RuntimeException e) {
+            return ResponseEntity.notFound().build();
+        }
+    }
+    
+    @PostMapping("/collect-all")
+    public ResponseEntity<String> collectAllMetrics() {
+        agentService.collectMetricsFromAllAgents();
+        return ResponseEntity.ok("Metrics collection started for all agents");
+    }
+    
+    @PostMapping("/{id}/health")
+    public ResponseEntity<Agent> checkHealth(@PathVariable Long id) {
+        try {
+            Agent agent = agentService.getAgentById(id)
+                    .orElseThrow(() -> new RuntimeException("Agent not found"));
+            agentService.checkAgentHealth(agent);
+            return ResponseEntity.ok(agent);
+        } catch (RuntimeException e) {
+            return ResponseEntity.notFound().build();
+        }
+    }
 }
