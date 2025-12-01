@@ -28,7 +28,10 @@ public class AgentController {
     
     @PostMapping
     public Agent createAgent(@RequestBody Agent agent) {
-        return agentService.createAgent(agent);
+        System.out.println("[API] POST /api/agents - Creating agent: " + agent.getName());
+        Agent result = agentService.createAgent(agent);
+        System.out.println("[API] POST /api/agents - Success");
+        return result;
     }
     
     @PutMapping("/{id}")

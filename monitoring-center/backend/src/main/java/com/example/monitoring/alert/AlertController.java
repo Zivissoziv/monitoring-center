@@ -31,7 +31,10 @@ private AlertService alertService;
     
     @PostMapping("/rules")
     public AlertRule createAlertRule(@RequestBody AlertRule alertRule) {
-        return alertService.createAlertRule(alertRule);
+        System.out.println("[API] POST /api/alerts/rules - Creating alert rule: " + alertRule.getName());
+        AlertRule result = alertService.createAlertRule(alertRule);
+        System.out.println("[API] POST /api/alerts/rules - Success");
+        return result;
     }
     
     @PutMapping("/rules/{id}")

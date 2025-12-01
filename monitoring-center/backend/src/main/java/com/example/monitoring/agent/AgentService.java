@@ -21,17 +21,7 @@ public class AgentService {
     @Autowired
     private MetricRepository metricRepository;
     
-    private final RestTemplate restTemplate;
-    
-    public AgentService() {
-        this.restTemplate = new RestTemplate();
-        // Set connection timeout to 5 seconds and read timeout to 5 seconds
-        this.restTemplate.setRequestFactory(new org.springframework.http.client.SimpleClientHttpRequestFactory());
-        ((org.springframework.http.client.SimpleClientHttpRequestFactory) this.restTemplate.getRequestFactory())
-                .setConnectTimeout(5000);
-        ((org.springframework.http.client.SimpleClientHttpRequestFactory) this.restTemplate.getRequestFactory())
-                .setReadTimeout(5000);
-    }
+    private final RestTemplate restTemplate = new RestTemplate();
     
     public List<Agent> getAllAgents() {
         return agentRepository.findAll();
@@ -77,26 +67,15 @@ public class AgentService {
     public void checkAgentHealth(Agent agent) {
         try {
             String url = "http://" + agent.getIp() + ":" + agent.getPort() + "/health";
-            System.out.println("Checking agent health: " + url);
             ResponseEntity<Map> response = restTemplate.getForEntity(url, Map.class);
             
             if (response.getStatusCode() == HttpStatus.OK) {
                 agent.setStatus("ACTIVE");
-                System.out.println("Agent " + agent.getName() + " is ACTIVE");
             } else {
                 agent.setStatus("DISCONNECTED");
-                System.err.println("Agent " + agent.getName() + " returned status: " + response.getStatusCode());
             }
-        } catch (org.springframework.web.client.ResourceAccessException e) {
-            agent.setStatus("DISCONNECTED");
-            System.err.println("Cannot connect to agent " + agent.getName() + " at " + agent.getIp() + ":" + agent.getPort());
-            System.err.println("Please ensure:");
-            System.err.println("  1. Agent is running on " + agent.getIp() + ":" + agent.getPort());
-            System.err.println("  2. Network connectivity is available");
-            System.err.println("  3. Firewall allows connection to port " + agent.getPort());
         } catch (Exception e) {
             agent.setStatus("DISCONNECTED");
-            System.err.println("Failed to connect to agent " + agent.getName() + ": " + e.getClass().getSimpleName() + " - " + e.getMessage());
         }
         agentRepository.save(agent);
     }
@@ -110,7 +89,6 @@ public class AgentService {
         
         try {
             String url = "http://" + agent.getIp() + ":" + agent.getPort() + "/metrics";
-            System.out.println("Collecting metrics from: " + url);
             ResponseEntity<Map> response = restTemplate.getForEntity(url, Map.class);
             
             if (response.getStatusCode() == HttpStatus.OK && response.getBody() != null) {
@@ -139,18 +117,10 @@ public class AgentService {
                 // Update agent status to ACTIVE
                 agent.setStatus("ACTIVE");
                 agentRepository.save(agent);
-                
-                System.out.println("Successfully collected metrics from agent: " + agent.getName());
             }
-        } catch (org.springframework.web.client.ResourceAccessException e) {
-            agent.setStatus("DISCONNECTED");
-            agentRepository.save(agent);
-            System.err.println("Cannot connect to agent " + agent.getName() + " at " + agent.getIp() + ":" + agent.getPort());
-            System.err.println("Connection error: " + e.getCause().getClass().getSimpleName());
         } catch (Exception e) {
             agent.setStatus("DISCONNECTED");
             agentRepository.save(agent);
-            System.err.println("Failed to collect metrics from agent " + agent.getName() + ": " + e.getClass().getSimpleName() + " - " + e.getMessage());
         }
     }
     

@@ -6,33 +6,37 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Optional;
 
 @Service
 public class AlertService {
-    
+
     @Autowired
     private AlertRuleRepository alertRuleRepository;
-    
+
+    @Autowired
+    private AlertRepository alertRepository;
+
     @Autowired
     private MetricRepository metricRepository;
-    
+
     public List<AlertRule> getAllAlertRules() {
         return alertRuleRepository.findAll();
     }
-    
+
     public AlertRule getAlertRuleById(Long id) {
         return alertRuleRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Alert rule not found with id: " + id));
     }
-    
+
     public AlertRule createAlertRule(AlertRule alertRule) {
         return alertRuleRepository.save(alertRule);
     }
-    
+
     public AlertRule updateAlertRule(Long id, AlertRule alertRuleDetails) {
         AlertRule alertRule = alertRuleRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Alert rule not found with id: " + id));
-        
+
         alertRule.setName(alertRuleDetails.getName());
         alertRule.setAgentId(alertRuleDetails.getAgentId());
         alertRule.setMetricType(alertRuleDetails.getMetricType());
@@ -40,21 +44,23 @@ public class AlertService {
         alertRule.setThreshold(alertRuleDetails.getThreshold());
         alertRule.setSeverity(alertRuleDetails.getSeverity());
         alertRule.setEnabled(alertRuleDetails.isEnabled());
-        
+
         return alertRuleRepository.save(alertRule);
     }
-    
+
     public void deleteAlertRule(Long id) {
         AlertRule alertRule = alertRuleRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Alert rule not found with id: " + id));
-        
+
         alertRuleRepository.delete(alertRule);
     }
-    
+
     public boolean checkAlert(Metric metric) {
         // Get all enabled alert rules for this metric type
         List<AlertRule> alertRules = alertRuleRepository.findByMetricTypeAndEnabledTrue(metric.getMetricType());
-        
+
+        boolean anyAlertTriggered = false;
+
         for (AlertRule rule : alertRules) {
             // Check if rule applies to this agent or to all agents
             if (rule.getAgentId() == null || rule.getAgentId().equals(metric.getAgentId())) {
@@ -71,20 +77,93 @@ public class AlertService {
                         alertTriggered = metric.getValue() == rule.getThreshold();
                         break;
                 }
-                
+
                 if (alertTriggered) {
-                    // In a real implementation, we would send an alert notification here
-                    System.out.println("ALERT TRIGGERED: " + rule.getName() + 
-                            " for agent " + metric.getAgentId() + 
-                            " - Metric " + metric.getMetricType() + 
-                            " value " + metric.getValue() + 
-                            " " + rule.getCondition() + 
-                            " threshold " + rule.getThreshold());
-                    return true;
+                    // Record or update alert (merge if exists)
+                    recordAlert(rule, metric);
+                    anyAlertTriggered = true;
                 }
             }
         }
-        
-        return false;
+
+        return anyAlertTriggered;
+    }
+
+    /**
+     * Record alert or update existing one (merge alerts for same rule and agent)
+     */
+    private void recordAlert(AlertRule rule, Metric metric) {
+        Optional<Alert> existingAlert = alertRepository.findByAlertRuleIdAndAgentId(
+                rule.getId(), metric.getAgentId());
+
+        if (existingAlert.isPresent()) {
+            // Update existing alert
+            Alert alert = existingAlert.get();
+            alert.setTriggerValue(metric.getValue());
+            alert.setLastTriggeredAt(System.currentTimeMillis());
+            alert.setTriggerCount(alert.getTriggerCount() + 1);
+                    
+            // If alert was resolved, reactivate it
+            if ("RESOLVED".equals(alert.getStatus())) {
+                alert.setStatus("ACTIVE");
+                alert.setResolveNote(null);
+            }
+                    
+            alertRepository.save(alert);
+        } else {
+            // Create new alert
+            Alert alert = new Alert(
+                    rule.getId(),
+                    metric.getAgentId(),
+                    rule.getName(),
+                    metric.getMetricType(),
+                    metric.getValue(),
+                    rule.getThreshold(),
+                    rule.getSeverity()
+            );
+            alertRepository.save(alert);
+        }
+    }
+
+    // Alert management methods
+
+    public List<Alert> getAllAlerts() {
+        return alertRepository.findAll();
+    }
+
+    public List<Alert> getActiveAlerts() {
+        return alertRepository.findByStatusOrderByLastTriggeredAtDesc("ACTIVE");
+    }
+
+    public List<Alert> getAlertsByStatus(String status) {
+        return alertRepository.findByStatusOrderByLastTriggeredAtDesc(status);
+    }
+
+    public Alert acknowledgeAlert(Long alertId, String acknowledgedBy) {
+        Alert alert = alertRepository.findById(alertId)
+                .orElseThrow(() -> new RuntimeException("Alert not found with id: " + alertId));
+
+        alert.setStatus("ACKNOWLEDGED");
+        alert.setAcknowledgedBy(acknowledgedBy);
+        alert.setAcknowledgedAt(System.currentTimeMillis());
+
+        return alertRepository.save(alert);
+    }
+
+    public Alert resolveAlert(Long alertId, String resolveNote) {
+        Alert alert = alertRepository.findById(alertId)
+                .orElseThrow(() -> new RuntimeException("Alert not found with id: " + alertId));
+
+        alert.setStatus("RESOLVED");
+        alert.setResolveNote(resolveNote);
+
+        return alertRepository.save(alert);
+    }
+
+    public void deleteAlert(Long alertId) {
+        Alert alert = alertRepository.findById(alertId)
+                .orElseThrow(() -> new RuntimeException("Alert not found with id: " + alertId));
+
+        alertRepository.delete(alert);
     }
 }

@@ -31,11 +31,17 @@ public class MetricController {
     
     @PostMapping
     public Metric saveMetric(@RequestBody Metric metric) {
-        return metricService.saveMetric(metric);
+        System.out.println("[API] POST /api/metrics - Saving metric for agent: " + metric.getAgentId());
+        Metric result = metricService.saveMetric(metric);
+        System.out.println("[API] POST /api/metrics - Success");
+        return result;
     }
     
     @PostMapping("/batch")
     public List<Metric> saveMetrics(@RequestBody List<Metric> metrics) {
-        return metricService.saveMetrics(metrics);
+        System.out.println("[API] POST /api/metrics/batch - Saving " + metrics.size() + " metrics");
+        List<Metric> result = metricService.saveMetrics(metrics);
+        System.out.println("[API] POST /api/metrics/batch - Success");
+        return result;
     }
 }
