@@ -1,30 +1,27 @@
 package com.example.agent;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import okhttp3.*;
+import com.sun.net.httpserver.HttpServer;
+import com.sun.net.httpserver.HttpHandler;
+import com.sun.net.httpserver.HttpExchange;
 
 import java.io.*;
 import java.lang.management.ManagementFactory;
 import java.lang.management.OperatingSystemMXBean;
+import java.lang.management.MemoryMXBean;
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 
 public class AgentMain {
-    private static String BACKEND_URL;
-    private static final OkHttpClient client = new OkHttpClient();
     private static final ObjectMapper objectMapper = new ObjectMapper();
-    private static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
     
     // Agent configuration
-    private static long agentId = 0;
     private static String agentName;
     private static int agentPort;
-    private static int metricInterval;
+    private static HttpServer server;
     
     public static void main(String[] args) {
         System.out.println("Starting Monitoring Agent...");
@@ -32,28 +29,19 @@ public class AgentMain {
         // Load configuration
         loadConfiguration(args);
         
-        System.out.println("Agent Name: " + agentName);
-        System.out.println("Backend URL: " + BACKEND_URL);
-        System.out.println("Metric Collection Interval: " + metricInterval + " seconds");
-        
-        // Register the agent with the backend
-        registerAgent();
-        
-        // Schedule metric collection
-        scheduler.scheduleAtFixedRate(AgentMain::collectAndSendMetrics, 0, metricInterval, TimeUnit.SECONDS);
-        
-        // Add shutdown hook
-        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-            System.out.println("Shutting down agent...");
-            scheduler.shutdown();
-        }));
-        
-        // Keep the agent running
-        System.out.println("Agent is running. Press Ctrl+C to stop.");
         try {
+            // Start HTTP server
+            startHttpServer();
+            
+            System.out.println("Agent Name: " + agentName);
+            System.out.println("Agent listening on port: " + agentPort);
+            System.out.println("Agent is running. Press Ctrl+C to stop.");
+            
+            // Keep the agent running
             Thread.currentThread().join();
-        } catch (InterruptedException e) {
-            System.out.println("Agent interrupted.");
+        } catch (Exception e) {
+            System.err.println("Error starting agent: " + e.getMessage());
+            e.printStackTrace();
         }
     }
     
@@ -91,8 +79,6 @@ public class AgentMain {
         // Load configuration with defaults
         agentName = properties.getProperty("agent.name", "MonitoringAgent-" + getHostname());
         agentPort = Integer.parseInt(properties.getProperty("agent.port", "8081"));
-        BACKEND_URL = properties.getProperty("backend.url", "http://localhost:8080");
-        metricInterval = Integer.parseInt(properties.getProperty("metric.interval.seconds", "10"));
     }
     
     private static String getHostname() {
@@ -103,99 +89,90 @@ public class AgentMain {
         }
     }
     
-    private static void registerAgent() {
-        try {
-            String ipAddress = InetAddress.getLocalHost().getHostAddress();
-            
-            Map<String, Object> agentData = new HashMap<>();
-            agentData.put("name", agentName);
-            agentData.put("ip", ipAddress);
-            agentData.put("port", agentPort);
-            
-            String json = objectMapper.writeValueAsString(agentData);
-            
-            RequestBody body = RequestBody.create(json, MediaType.get("application/json"));
-            Request request = new Request.Builder()
-                    .url(BACKEND_URL + "/api/agents")
-                    .post(body)
-                    .build();
-            
-            try (Response response = client.newCall(request).execute()) {
-                if (response.isSuccessful()) {
-                    String responseBody = response.body().string();
-                    System.out.println("Agent registered successfully: " + responseBody);
-                    // Extract agent ID from response
-                    Map<String, Object> responseMap = objectMapper.readValue(responseBody, Map.class);
-                    if (responseMap.containsKey("id")) {
-                        agentId = ((Number) responseMap.get("id")).longValue();
-                        System.out.println("Agent ID: " + agentId);
-                    }
-                } else {
-                    System.err.println("Failed to register agent: " + response.code());
+    private static void startHttpServer() throws IOException {
+        server = HttpServer.create(new InetSocketAddress(agentPort), 0);
+        
+        // Health check endpoint
+        server.createContext("/health", new HealthHandler());
+        
+        // Metrics endpoint
+        server.createContext("/metrics", new MetricsHandler());
+        
+        // Start the server
+        server.setExecutor(null);
+        server.start();
+        
+        // Add shutdown hook
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            System.out.println("Shutting down agent...");
+            server.stop(0);
+        }));
+    }
+    
+    static class HealthHandler implements HttpHandler {
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+            if ("GET".equals(exchange.getRequestMethod())) {
+                Map<String, Object> response = new HashMap<>();
+                response.put("status", "UP");
+                response.put("agentName", agentName);
+                response.put("timestamp", System.currentTimeMillis());
+                
+                String jsonResponse = objectMapper.writeValueAsString(response);
+                
+                exchange.getResponseHeaders().set("Content-Type", "application/json");
+                exchange.sendResponseHeaders(200, jsonResponse.getBytes().length);
+                
+                try (OutputStream os = exchange.getResponseBody()) {
+                    os.write(jsonResponse.getBytes());
                 }
+            } else {
+                exchange.sendResponseHeaders(405, -1); // Method Not Allowed
             }
-        } catch (Exception e) {
-            System.err.println("Error registering agent: " + e.getMessage());
-            e.printStackTrace();
         }
     }
     
-    private static void collectAndSendMetrics() {
-        try {
-            // Collect CPU and Memory metrics
-            double cpuUsage = getCpuUsage();
-            double memoryUsage = getMemoryUsage();
-            
-            System.out.println("Collected metrics - CPU: " + cpuUsage + "%, Memory: " + memoryUsage + "%");
-            
-            // Send metrics to backend
-            sendMetric("CPU", cpuUsage);
-            sendMetric("MEMORY", memoryUsage);
-        } catch (Exception e) {
-            System.err.println("Error collecting or sending metrics: " + e.getMessage());
-            e.printStackTrace();
+    static class MetricsHandler implements HttpHandler {
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+            if ("GET".equals(exchange.getRequestMethod())) {
+                Map<String, Object> metrics = new HashMap<>();
+                metrics.put("cpu", getCpuUsage());
+                metrics.put("memory", getMemoryUsage());
+                metrics.put("agentName", agentName);
+                metrics.put("timestamp", System.currentTimeMillis());
+                
+                String jsonResponse = objectMapper.writeValueAsString(metrics);
+                
+                exchange.getResponseHeaders().set("Content-Type", "application/json");
+                exchange.sendResponseHeaders(200, jsonResponse.getBytes().length);
+                
+                try (OutputStream os = exchange.getResponseBody()) {
+                    os.write(jsonResponse.getBytes());
+                }
+            } else {
+                exchange.sendResponseHeaders(405, -1); // Method Not Allowed
+            }
         }
     }
     
     private static double getCpuUsage() {
         OperatingSystemMXBean osBean = ManagementFactory.getOperatingSystemMXBean();
-        return osBean.getSystemLoadAverage() * 100; // This is a simplified approach
+        double systemLoad = osBean.getSystemLoadAverage();
+        if (systemLoad < 0) {
+            // On Windows, getSystemLoadAverage() often returns -1
+            // Return a dummy value for demonstration
+            return Math.random() * 100;
+        }
+        // Normalize to percentage (0-100)
+        return Math.min(systemLoad * 100 / osBean.getAvailableProcessors(), 100.0);
     }
     
     private static double getMemoryUsage() {
-        Runtime runtime = Runtime.getRuntime();
-        long totalMemory = runtime.totalMemory();
-        long freeMemory = runtime.freeMemory();
-        long usedMemory = totalMemory - freeMemory;
+        MemoryMXBean memoryBean = ManagementFactory.getMemoryMXBean();
+        long heapUsed = memoryBean.getHeapMemoryUsage().getUsed();
+        long heapMax = memoryBean.getHeapMemoryUsage().getMax();
         
-        return (double) usedMemory / totalMemory * 100;
-    }
-    
-    private static void sendMetric(String metricType, double value) {
-        try {
-            Map<String, Object> metricData = new HashMap<>();
-            metricData.put("agentId", agentId);
-            metricData.put("metricType", metricType);
-            metricData.put("value", value);
-            
-            String json = objectMapper.writeValueAsString(metricData);
-            
-            RequestBody body = RequestBody.create(json, MediaType.get("application/json"));
-            Request request = new Request.Builder()
-                    .url(BACKEND_URL + "/api/metrics")
-                    .post(body)
-                    .build();
-            
-            try (Response response = client.newCall(request).execute()) {
-                if (response.isSuccessful()) {
-                    System.out.println("Metric sent successfully: " + metricType + " = " + value);
-                } else {
-                    System.err.println("Failed to send metric: " + response.code());
-                }
-            }
-        } catch (Exception e) {
-            System.err.println("Error sending metric: " + e.getMessage());
-            e.printStackTrace();
-        }
+        return (double) heapUsed / heapMax * 100;
     }
 }

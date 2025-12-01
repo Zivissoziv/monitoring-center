@@ -50,9 +50,9 @@ The frontend will run on http://localhost:3000
 ## Agent
 
 The agent is a Java application that:
-- Collects CPU and memory metrics
-- Sends metrics to the backend
-- Registers itself with the backend
+- Runs an embedded HTTP server
+- Responds to metric requests from the backend
+- Provides health check endpoint
 
 ### Building the Agent
 
@@ -61,34 +61,40 @@ cd agent
 mvn clean package
 ```
 
-This will create `target/monitoring-agent.jar` - a standalone executable JAR.
+This will create `target/monitoring-agent-1.0-SNAPSHOT.jar` - a standalone executable JAR.
 
 ### Deploying the Agent
 
 1. Copy the following files to your target server:
-   - `target/monitoring-agent.jar`
+   - `target/monitoring-agent-1.0-SNAPSHOT.jar`
    - `agent.properties.template` (rename to `agent.properties`)
    - `start-agent.sh` (Linux/Mac) or `start-agent.bat` (Windows)
-   - `stop-agent.sh` (Linux/Mac, optional)
+   - `stop-agent.sh` (Linux/Mac) or `stop-agent.bat` (Windows)
 
 2. Edit `agent.properties` to configure:
    - `agent.name`: Unique name for this agent
-   - `backend.url`: URL of your monitoring backend
-   - `metric.interval.seconds`: How often to collect metrics
+   - `agent.port`: Port for the agent to listen on (default: 8081)
 
 3. Start the agent:
    - **Linux/Mac**: `./start-agent.sh`
    - **Windows**: `start-agent.bat`
-   - **Manual**: `java -jar monitoring-agent.jar agent.properties`
+   - **Manual**: `java -jar monitoring-agent-1.0-SNAPSHOT.jar agent.properties`
 
-4. Stop the agent (Linux/Mac): `./stop-agent.sh`
+4. Stop the agent:
+   - **Linux/Mac**: `./stop-agent.sh`
+   - **Windows**: `stop-agent.bat`
 
 ### Configuration
 
 The agent supports configuration via:
 1. External `agent.properties` file (recommended for production)
 2. Built-in default configuration
-3. Command-line argument: `java -jar monitoring-agent.jar /path/to/config.properties`
+3. Command-line argument: `java -jar monitoring-agent-1.0-SNAPSHOT.jar /path/to/config.properties`
+
+### API Endpoints
+
+- GET /health - Health check endpoint
+- GET /metrics - Get current CPU and memory metrics
 
 ## Features
 

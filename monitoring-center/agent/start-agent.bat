@@ -1,7 +1,7 @@
 @echo off
 REM Monitoring Agent Startup Script for Windows
 
-set AGENT_JAR=monitoring-agent.jar
+set AGENT_JAR=monitoring-agent-1.0-SNAPSHOT.jar
 set CONFIG_FILE=agent.properties
 
 echo Starting Monitoring Agent...

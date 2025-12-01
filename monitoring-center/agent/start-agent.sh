@@ -2,7 +2,7 @@
 
 # Monitoring Agent Startup Script
 
-AGENT_JAR="monitoring-agent.jar"
+AGENT_JAR="monitoring-agent-1.0-SNAPSHOT.jar"
 CONFIG_FILE="agent.properties"
 PID_FILE="agent.pid"
 
