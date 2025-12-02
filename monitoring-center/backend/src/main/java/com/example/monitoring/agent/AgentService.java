@@ -1,5 +1,6 @@
 package com.example.monitoring.agent;
 
+import com.example.monitoring.alert.AlertService;
 import com.example.monitoring.metric.Metric;
 import com.example.monitoring.metric.MetricRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,6 +21,9 @@ public class AgentService {
     
     @Autowired
     private MetricRepository metricRepository;
+    
+    @Autowired
+    private AlertService alertService;
     
     private final RestTemplate restTemplate = new RestTemplate();
     
@@ -101,7 +105,9 @@ public class AgentService {
                     cpuMetric.setMetricType("CPU");
                     cpuMetric.setValue(((Number) metricsData.get("cpu")).doubleValue());
                     cpuMetric.setTimestamp(System.currentTimeMillis());
-                    metricRepository.save(cpuMetric);
+                    Metric savedCpuMetric = metricRepository.save(cpuMetric);
+                    // Check if any alerts should be triggered
+                    alertService.checkAlert(savedCpuMetric);
                 }
                 
                 // Save Memory metric
@@ -111,7 +117,9 @@ public class AgentService {
                     memoryMetric.setMetricType("MEMORY");
                     memoryMetric.setValue(((Number) metricsData.get("memory")).doubleValue());
                     memoryMetric.setTimestamp(System.currentTimeMillis());
-                    metricRepository.save(memoryMetric);
+                    Metric savedMemoryMetric = metricRepository.save(memoryMetric);
+                    // Check if any alerts should be triggered
+                    alertService.checkAlert(savedMemoryMetric);
                 }
                 
                 // Update agent status to ACTIVE

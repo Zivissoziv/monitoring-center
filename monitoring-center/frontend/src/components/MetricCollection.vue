@@ -33,6 +33,8 @@
             <option value="20">最近20条</option>
             <option value="50">最近50条</option>
             <option value="100">最近100条</option>
+            <option value="200">最近200条</option>
+            <option value="500">最近500条</option>
           </select>
         </div>
       </div>
@@ -68,7 +70,6 @@
               <th>指标类型</th>
               <th>数值</th>
               <th>时间戳</th>
-              <th>是否触发告警</th>
             </tr>
           </thead>
           <tbody>
@@ -78,9 +79,6 @@
               <td><span :class="'metric-type metric-' + metric.metricType.toLowerCase()">{{ getMetricTypeName(metric.metricType) }}</span></td>
               <td><span class="metric-value">{{ formatValue(metric.value, metric.metricType) }}</span></td>
               <td>{{ formatTime(metric.timestamp) }}</td>
-              <td><span :class="isAlertTriggered(metric) ? 'alert-triggered' : 'alert-not-triggered'">
-                {{ isAlertTriggered(metric) ? '是' : '否' }}
-              </span></td>
             </tr>
           </tbody>
         </table>
@@ -93,30 +91,33 @@
       <div v-if="filteredMetrics.length === 0" class="no-data-message">
         <p>📊 暂无符合条件的监控数据</p>
       </div>
-      <div v-else class="chart-container">
-        <canvas ref="metricsChart"></canvas>
+      <div v-else class="chart-container-wrapper">
+        <div v-if="filteredMetrics.length > 100" class="chart-warning">
+          <p>ℹ️ 数据点较多({{ filteredMetrics.length }}个)，图表已自动采样以提高性能，仅显示最新100个数据点</p>
+        </div>
+        <div class="chart-container">
+          <canvas ref="metricsChart"></canvas>
+        </div>
       </div>
     </div>
   </div>
 </template>
 
 <script>
-import { Chart, LineController, LineElement, PointElement, LinearScale, CategoryScale, Title, Tooltip, Legend } from 'chart.js'
-
-Chart.register(LineController, LineElement, PointElement, LinearScale, CategoryScale, Title, Tooltip, Legend)
+import { Chart } from 'chart.js/auto'
 
 export default {
   name: 'MetricCollection',
   data() {
     return {
       metrics: [],
-      alertRules: [],
       filteredMetrics: [],
       selectedMetricType: 'ALL',
       selectedAgent: 'ALL',
-      timeRange: '50',
+      timeRange: '100', // Increased default
       viewMode: 'table', // 'table' or 'chart'
-      chartInstance: null
+      chartInstance: null,
+      interval: null
     }
   },
   computed: {
@@ -168,10 +169,6 @@ export default {
         // Sort by timestamp descending (newest first)
         this.metrics.sort((a, b) => b.timestamp - a.timestamp)
         
-        // Load alert rules
-        const alertRulesResponse = await fetch('/api/alerts/rules')
-        this.alertRules = await alertRulesResponse.json()
-        
         this.filterMetrics()
       } catch (error) {
         console.error('Error loading data:', error)
@@ -197,90 +194,111 @@ export default {
     renderChart() {
       if (!this.$refs.metricsChart) return
       
-      // Destroy existing chart
-      if (this.chartInstance) {
-        this.chartInstance.destroy()
-      }
-      
-      const ctx = this.$refs.metricsChart.getContext('2d')
-      
-      // Prepare data for chart
-      const chartData = this.prepareChartData()
-      
-      this.chartInstance = new Chart(ctx, {
-        type: 'line',
-        data: chartData,
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            title: {
-              display: true,
-              text: this.getChartTitle(),
-              font: {
-                size: 16,
-                weight: 'bold'
-              },
-              color: '#1976d2'
-            },
-            legend: {
-              display: true,
-              position: 'top',
-              labels: {
-                color: '#000000',
+      try {
+        // Destroy existing chart
+        if (this.chartInstance) {
+          this.chartInstance.destroy()
+        }
+        
+        const ctx = this.$refs.metricsChart.getContext('2d')
+        
+        // Prepare data for chart - limit to 100 data points for performance
+        const chartData = this.prepareChartData()
+        
+        this.chartInstance = new Chart(ctx, {
+          type: 'line',
+          data: chartData,
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              title: {
+                display: true,
+                text: this.getChartTitle(),
                 font: {
-                  size: 12,
-                  weight: '600'
-                }
-              }
-            },
-            tooltip: {
-              mode: 'index',
-              intersect: false,
-              backgroundColor: 'rgba(0, 0, 0, 0.8)',
-              titleColor: '#ffffff',
-              bodyColor: '#ffffff',
-              borderColor: '#1976d2',
-              borderWidth: 1
-            }
-          },
-          scales: {
-            y: {
-              beginAtZero: true,
-              max: 100,
-              ticks: {
-                callback: function(value) {
-                  return value + '%'
+                  size: 16,
+                  weight: 'bold'
                 },
-                color: '#000000',
-                font: {
-                  weight: '600'
+                color: '#1976d2'
+              },
+              legend: {
+                display: true,
+                position: 'top',
+                labels: {
+                  color: '#000000',
+                  font: {
+                    size: 12,
+                    weight: '600'
+                  }
                 }
               },
-              grid: {
-                color: 'rgba(0, 0, 0, 0.1)'
+              tooltip: {
+                mode: 'index',
+                intersect: false,
+                backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                titleColor: '#ffffff',
+                bodyColor: '#ffffff',
+                borderColor: '#1976d2',
+                borderWidth: 1
               }
             },
-            x: {
-              ticks: {
-                color: '#000000',
-                font: {
-                  weight: '600'
+            scales: {
+              y: {
+                beginAtZero: true,
+                max: 100,
+                ticks: {
+                  callback: function(value) {
+                    return value + '%'
+                  },
+                  color: '#000000',
+                  font: {
+                    weight: '600'
+                  }
                 },
-                maxRotation: 45,
-                minRotation: 45
+                grid: {
+                  color: 'rgba(0, 0, 0, 0.1)'
+                }
               },
-              grid: {
-                color: 'rgba(0, 0, 0, 0.1)'
+              x: {
+                ticks: {
+                  color: '#000000',
+                  font: {
+                    weight: '600'
+                  },
+                  maxTicksLimit: 15, // Increased limit
+                  maxRotation: 45,
+                  minRotation: 45
+                },
+                grid: {
+                  color: 'rgba(0, 0, 0, 0.1)'
+                }
               }
             }
           }
+        })
+      } catch (error) {
+        console.error('Error rendering chart:', error)
+        // Display error message to user
+        if (this.$refs.metricsChart) {
+          const ctx = this.$refs.metricsChart.getContext('2d')
+          ctx.clearRect(0, 0, this.$refs.metricsChart.width, this.$refs.metricsChart.height)
+          ctx.fillStyle = '#000000'
+          ctx.font = '16px Arial'
+          ctx.fillText('图表渲染失败，请刷新页面重试', 50, 50)
         }
-      })
+      }
     },
     
     prepareChartData() {
-      const data = this.paginatedMetrics.slice().reverse() // Reverse to show oldest to newest
+      // Limit data points to prevent chart clutter (max 100 points)
+      const maxDataPoints = 100;
+      let data = this.paginatedMetrics.slice().reverse() // Reverse to show oldest to newest
+      
+      // Sample data if there are too many points
+      if (data.length > maxDataPoints) {
+        const step = Math.ceil(data.length / maxDataPoints);
+        data = data.filter((_, index) => index % step === 0);
+      }
       
       const labels = data.map(m => this.formatTimeShort(m.timestamp))
       
@@ -300,8 +318,8 @@ export default {
             backgroundColor: 'rgba(198, 40, 40, 0.1)',
             borderWidth: 2,
             tension: 0.4,
-            pointRadius: 4,
-            pointHoverRadius: 6
+            pointRadius: data.length > 50 ? 0 : 2, // Hide points when too many data points
+            pointHoverRadius: 4
           })
         }
         
@@ -313,8 +331,8 @@ export default {
             backgroundColor: 'rgba(25, 118, 210, 0.1)',
             borderWidth: 2,
             tension: 0.4,
-            pointRadius: 4,
-            pointHoverRadius: 6
+            pointRadius: data.length > 50 ? 0 : 2, // Hide points when too many data points
+            pointHoverRadius: 4
           })
         }
       } else {
@@ -333,8 +351,8 @@ export default {
               backgroundColor: colors[index % colors.length] + '20',
               borderWidth: 2,
               tension: 0.4,
-              pointRadius: 4,
-              pointHoverRadius: 6
+              pointRadius: data.length > 30 ? 0 : 2, // Hide points when too many data points
+              pointHoverRadius: 4
             })
           })
         } else {
@@ -348,8 +366,8 @@ export default {
             backgroundColor: color + '20',
             borderWidth: 2,
             tension: 0.4,
-            pointRadius: 4,
-            pointHoverRadius: 6
+            pointRadius: data.length > 50 ? 0 : 2, // Hide points when too many data points
+            pointHoverRadius: 4
           })
         }
       }
@@ -393,32 +411,6 @@ export default {
     formatTimeShort(timestamp) {
       const date = new Date(timestamp)
       return date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
-    },
-    
-    isAlertTriggered(metric) {
-      // Check if this metric would trigger any alert rule
-      return this.alertRules.some(rule => {
-        // Rule must be enabled
-        if (!rule.enabled) return false
-        
-        // Rule must match metric type
-        if (rule.metricType !== metric.metricType) return false
-        
-        // Rule must apply to this agent or all agents
-        if (rule.agentId !== null && rule.agentId !== metric.agentId) return false
-        
-        // Check condition
-        switch (rule.condition) {
-          case 'GT':
-            return metric.value > rule.threshold
-          case 'LT':
-            return metric.value < rule.threshold
-          case 'EQ':
-            return metric.value === rule.threshold
-          default:
-            return false
-        }
-      })
     }
   }
 }
@@ -507,10 +499,27 @@ export default {
   border-color: #1976d2;
 }
 
+.chart-container-wrapper {
+  position: relative;
+}
+
+.chart-warning {
+  background: #fff3e0;
+  border: 1px solid #ffa726;
+  border-radius: 6px;
+  padding: 10px;
+  margin-bottom: 15px;
+  text-align: center;
+  color: #ef6c00;
+  font-weight: 600;
+}
+
 .chart-container {
   position: relative;
-  height: 400px;
+  height: 500px; /* Increased height */
   padding: 20px;
+  background: #f9f9f9;
+  border-radius: 8px;
 }
 
 .metric-view table {
@@ -567,26 +576,6 @@ export default {
   font-size: 15px;
 }
 
-.alert-triggered {
-  padding: 4px 12px;
-  border-radius: 12px;
-  font-size: 12px;
-  font-weight: 600;
-  background: #ffebee;
-  color: #c62828;
-  border: 1px solid #ef5350;
-}
-
-.alert-not-triggered {
-  padding: 4px 12px;
-  border-radius: 12px;
-  font-size: 12px;
-  font-weight: 600;
-  background: #e8f5e9;
-  color: #2e7d32;
-  border: 1px solid #66bb6a;
-}
-
 .section-header h2 {
   color: #1976d2;
   font-size: 24px;
@@ -621,39 +610,5 @@ export default {
 
 .table-container {
   overflow-x: auto;
-}
-
-table {
-  width: 100%;
-  border-collapse: separate;
-  border-spacing: 0;
-}
-
-thead {
-  background: #e3f2fd;
-}
-
-th {
-  padding: 15px;
-  text-align: left;
-  color: #1976d2;
-  font-weight: 600;
-  font-size: 14px;
-  border-bottom: 2px solid #bbdefb;
-}
-
-td {
-  padding: 15px;
-  color: #1976d2;
-  font-weight: 600;
-  border-bottom: 1px solid #e3f2fd;
-}
-
-tbody tr {
-  transition: all 0.3s ease;
-}
-
-tbody tr:hover {
-  background: #f5f5f5;
 }
 </style>

@@ -4,6 +4,9 @@
       <div class="header-content">
         <h1><span class="icon">📊</span> 监控中心</h1>
         <nav>
+          <button @click="activeTab = 'dashboard'" :class="{ active: activeTab === 'dashboard' }">
+            <span class="icon">📺</span> 监控台
+          </button>
           <button @click="activeTab = 'agents'" :class="{ active: activeTab === 'agents' }">
             <span class="icon">🖥️</span> 代理管理
           </button>
@@ -18,6 +21,7 @@
     </header>
     
     <main>
+      <MonitoringDashboard v-if="activeTab === 'dashboard'" />
       <AgentManagement v-if="activeTab === 'agents'" />
       <MetricCollection v-if="activeTab === 'metrics'" />
       <AlertManagement v-if="activeTab === 'alerts'" />
@@ -29,17 +33,19 @@
 import AgentManagement from './components/AgentManagement.vue'
 import MetricCollection from './components/MetricCollection.vue'
 import AlertManagement from './components/AlertManagement.vue'
+import MonitoringDashboard from './components/MonitoringDashboard.vue'
 
 export default {
   name: 'App',
   components: {
+    MonitoringDashboard,
     AgentManagement,
     MetricCollection,
     AlertManagement
   },
   data() {
     return {
-      activeTab: 'agents'
+      activeTab: 'dashboard'
     }
   }
 }
