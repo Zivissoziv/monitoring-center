@@ -5,6 +5,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/agents")
@@ -77,6 +78,17 @@ public class AgentController {
                     .orElseThrow(() -> new RuntimeException("Agent not found"));
             agentService.checkAgentHealth(agent);
             return ResponseEntity.ok(agent);
+        } catch (RuntimeException e) {
+            return ResponseEntity.notFound().build();
+        }
+    }
+    
+    // New endpoint for executing commands on agents
+    @PostMapping("/{id}/execute")
+    public ResponseEntity<Map<String, Object>> executeCommand(@PathVariable Long id, @RequestBody Map<String, String> commandRequest) {
+        try {
+            Map<String, Object> result = agentService.executeCommandOnAgent(id, commandRequest.get("command"));
+            return ResponseEntity.ok(result);
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();
         }

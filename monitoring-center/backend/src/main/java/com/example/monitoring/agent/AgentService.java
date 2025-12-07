@@ -9,6 +9,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -141,6 +142,36 @@ public class AgentService {
             if (!"INACTIVE".equals(agent.getStatus())) {
                 collectMetricsFromAgent(agent.getId());
             }
+        }
+    }
+    
+    /**
+     * Execute command on agent
+     */
+    public Map<String, Object> executeCommandOnAgent(Long agentId, String command) {
+        Agent agent = agentRepository.findById(agentId)
+                .orElseThrow(() -> new RuntimeException("Agent not found with id: " + agentId));
+        
+        try {
+            String url = "http://" + agent.getIp() + ":" + agent.getPort() + "/execute";
+            
+            // Prepare request body
+            Map<String, String> requestBody = new HashMap<>();
+            requestBody.put("command", command);
+            
+            // Send POST request to agent
+            ResponseEntity<Map> response = restTemplate.postForEntity(url, requestBody, Map.class);
+            
+            if (response.getStatusCode() == HttpStatus.OK && response.getBody() != null) {
+                return response.getBody();
+            } else {
+                throw new RuntimeException("Failed to execute command on agent: " + response.getStatusCode());
+            }
+        } catch (Exception e) {
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("error", "Failed to execute command: " + e.getMessage());
+            errorResponse.put("timestamp", System.currentTimeMillis());
+            return errorResponse;
         }
     }
 }
