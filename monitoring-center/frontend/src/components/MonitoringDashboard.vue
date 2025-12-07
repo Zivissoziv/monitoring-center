@@ -111,6 +111,160 @@
           </el-descriptions>
         </div>
         
+        <!-- Emergency Steps (moved to top) -->
+        <div class="card mb-3">
+          <h3>应急处理步骤</h3>
+          
+          <!-- Emergency Knowledge Base -->
+          <div v-if="emergencyKnowledge && emergencyKnowledge.steps && emergencyKnowledge.steps.length > 0">
+            <div class="knowledge-header">
+              <h4>{{ emergencyKnowledge.title }}</h4>
+              <p v-if="emergencyKnowledge.description" class="knowledge-description">{{ emergencyKnowledge.description }}</p>
+            </div>
+            
+            <div class="steps">
+              <div v-for="(step, index) in emergencyKnowledge.steps" :key="step.id" class="step">
+                <div class="step-number">{{ index + 1 }}</div>
+                <div class="step-content">
+                  <h4>{{ step.description }}</h4>
+                  <div class="step-command">
+                    <div class="command-label">执行命令：</div>
+                    <pre class="command-text">{{ step.linuxCommand }}</pre>
+                    <div class="command-actions">
+                      <button 
+                        @click="executeStepCommand(step.linuxCommand)" 
+                        :disabled="isExecutingCommand"
+                        :class="['btn-execute-command', { 'btn-loading': isExecutingCommand && executingCommand === step.linuxCommand }]"
+                        title="直接执行命令"
+                      >
+                        {{ isExecutingCommand && executingCommand === step.linuxCommand ? '执行中...' : '⚡ 执行' }}
+                      </button>
+                      <button 
+                        @click="copyCommand(step.linuxCommand)" 
+                        class="btn-copy-command"
+                        title="复制命令"
+                      >
+                        📋 复制
+                      </button>
+                    </div>
+                  </div>
+                  <div v-if="step.dependsOn" class="step-dependency">
+                    <span class="dependency-icon">⚠️</span>
+                    <span>依赖步骤: 步骤 {{ findStepNumber(step.dependsOn) }}</span>
+                  </div>
+                  <div v-if="step.notes" class="step-notes">
+                    <span class="notes-icon">💡</span>
+                    <span>{{ step.notes }}</span>
+                  </div>
+                  
+                  <!-- Command Result Display (per step) -->
+                  <div v-if="stepResults[index]" class="step-result mt-2">
+                    <div class="result-header">
+                      <span class="result-title">执行结果</span>
+                      <button @click="clearStepResult(index)" class="btn-clear-result">&times;</button>
+                    </div>
+                    <div class="result-summary">
+                      <span>退出码: </span>
+                      <span :class="['exit-code', { 'error-code': stepResults[index].exitCode !== 0 }]">
+                        {{ stepResults[index].exitCode }}
+                      </span>
+                      <span class="result-time"> | {{ formatTime(stepResults[index].timestamp) }}</span>
+                    </div>
+                    <div class="result-tabs">
+                      <button 
+                        :class="['result-tab', { active: stepResultTab[index] === 'output' }]" 
+                        @click="stepResultTab[index] = 'output'"
+                      >
+                        标准输出
+                      </button>
+                      <button 
+                        :class="['result-tab', { active: stepResultTab[index] === 'error' }]" 
+                        @click="stepResultTab[index] = 'error'"
+                      >
+                        错误输出
+                      </button>
+                    </div>
+                    <div class="result-content">
+                      <div v-if="stepResultTab[index] === 'output'">
+                        <pre v-if="stepResults[index].output" class="output-text">{{ stepResults[index].output }}</pre>
+                        <div v-else class="no-output">无标准输出</div>
+                      </div>
+                      <div v-if="stepResultTab[index] === 'error'">
+                        <pre v-if="stepResults[index].error" class="error-text">{{ stepResults[index].error }}</pre>
+                        <div v-else class="no-output">无错误输出</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Default Steps (if no knowledge base) -->
+          <div v-else>
+            <p class="no-knowledge-hint">暂无该告警规则的应急知识库，请在应急知识库页面配置。以下为默认应急流程：</p>
+            <div class="steps">
+              <div class="step">
+                <div class="step-number">1</div>
+                <div class="step-content">
+                  <h4>确认告警</h4>
+                  <p>检查当前告警详情，确认告警的真实性和严重程度</p>
+                </div>
+              </div>
+              <div class="step">
+                <div class="step-number">2</div>
+                <div class="step-content">
+                  <h4>定位问题</h4>
+                  <p>根据告警类型和代理IP，登录对应服务器进行问题排查</p>
+                </div>
+              </div>
+              <div class="step">
+                <div class="step-number">3</div>
+                <div class="step-content">
+                  <h4>临时处理</h4>
+                  <div v-if="selectedAlert && selectedAlert.metricType === 'CPU'">
+                    <p><strong>CPU告警</strong>: 检查高CPU进程，必要时重启相关服务</p>
+                  </div>
+                  <div v-else-if="selectedAlert && selectedAlert.metricType === 'MEMORY'">
+                    <p><strong>内存告警</strong>: 检查内存使用情况，清理缓存或重启应用</p>
+                  </div>
+                  <div v-else>
+                    <p><strong>通用处理</strong>: 检查系统资源使用情况，查看应用日志，必要时重启服务</p>
+                  </div>
+                </div>
+              </div>
+              <div class="step">
+                <div class="step-number">4</div>
+                <div class="step-content">
+                  <h4>根因分析</h4>
+                  <p>分析系统日志，找出问题根本原因</p>
+                </div>
+              </div>
+              <div class="step">
+                <div class="step-number">5</div>
+                <div class="step-content">
+                  <h4>永久解决</h4>
+                  <p>根据根因分析结果，实施永久性解决方案</p>
+                </div>
+              </div>
+              <div class="step">
+                <div class="step-number">6</div>
+                <div class="step-content">
+                  <h4>验证恢复</h4>
+                  <p>确认系统恢复正常，监控指标回到正常范围</p>
+                </div>
+              </div>
+              <div class="step">
+                <div class="step-number">7</div>
+                <div class="step-content">
+                  <h4>记录总结</h4>
+                  <p>记录问题处理过程和解决方案，更新知识库</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
         <!-- Metric Visualization Section -->
         <div class="card mb-3">
           <h3>监控指标视图</h3>
@@ -180,146 +334,90 @@
           </div>
         </div>
         
-        <!-- Command Execution Section -->
+        <!-- Command Execution Section (Collapsible) -->
         <div class="card mb-3">
-          <h3>命令执行窗口</h3>
-          <div class="form-group">
-            <label>目标代理:</label>
-            <input v-model="commandForm.agentInfo" disabled class="form-input" />
-          </div>
-          <div class="form-group">
-            <label>执行命令:</label>
-            <textarea
-              v-model="commandForm.command"
-              placeholder="输入要执行的Linux命令，例如: ps aux | grep java"
-              class="form-textarea"
-              rows="3"
-            ></textarea>
-          </div>
-          <div class="form-actions">
-            <button 
-              @click="executeCommand" 
-              :disabled="!commandForm.command.trim() || isExecutingCommand"
-              :class="['btn-primary', { 'btn-loading': isExecutingCommand }]"
-            >
-              {{ isExecutingCommand ? '执行中...' : '执行命令' }}
-            </button>
-            <button @click="clearCommandResult" :disabled="!commandResult" class="btn-secondary">
-              清空结果
-            </button>
+          <div class="collapsible-header" @click="showCommandWindow = !showCommandWindow">
+            <h3 style="margin: 0; cursor: pointer;">
+              <span class="collapse-icon">{{ showCommandWindow ? '▼' : '▶' }}</span>
+              命令执行窗口
+            </h3>
           </div>
           
-          <!-- Command Result Display -->
-          <div v-if="commandResult" class="mt-3">
-            <div class="card">
-              <h3>执行结果</h3>
-              <div class="result-details">
-                <div class="result-item">
-                  <span class="result-label">命令:</span>
-                  <span class="result-value">{{ commandResult.command }}</span>
-                </div>
-                <div class="result-item">
-                  <span class="result-label">退出码:</span>
-                  <span :class="['result-value', { 'error-code': commandResult.exitCode !== 0 }]">
-                    {{ commandResult.exitCode }}
-                  </span>
-                </div>
-                <div class="result-item">
-                  <span class="result-label">执行时间:</span>
-                  <span class="result-value">{{ formatTime(commandResult.timestamp) }}</span>
-                </div>
-              </div>
-              
-              <div class="mt-3">
-                <div class="tabs">
-                  <button 
-                    :class="['tab-btn', { active: activeTab === 'output' }]" 
-                    @click="activeTab = 'output'"
-                  >
-                    标准输出
-                  </button>
-                  <button 
-                    :class="['tab-btn', { active: activeTab === 'error' }]" 
-                    @click="activeTab = 'error'"
-                  >
-                    错误输出
-                  </button>
+          <div v-show="showCommandWindow" class="collapsible-content">
+            <div class="form-group">
+              <label>目标代理:</label>
+              <input v-model="commandForm.agentInfo" disabled class="form-input" />
+            </div>
+            <div class="form-group">
+              <label>执行命令:</label>
+              <textarea
+                v-model="commandForm.command"
+                placeholder="输入要执行的Linux命令，例如: ps aux | grep java"
+                class="form-textarea"
+                rows="3"
+              ></textarea>
+            </div>
+            <div class="form-actions">
+              <button 
+                @click="executeCommand" 
+                :disabled="!commandForm.command.trim() || isExecutingCommand"
+                :class="['btn-primary', { 'btn-loading': isExecutingCommand }]"
+              >
+                {{ isExecutingCommand ? '执行中...' : '执行命令' }}
+              </button>
+              <button @click="clearCommandResult" :disabled="!commandResult" class="btn-secondary">
+                清空结果
+              </button>
+            </div>
+            
+            <!-- Command Result Display -->
+            <div v-if="commandResult" class="mt-3">
+              <div class="card">
+                <h3>执行结果</h3>
+                <div class="result-details">
+                  <div class="result-item">
+                    <span class="result-label">命令:</span>
+                    <span class="result-value">{{ commandResult.command }}</span>
+                  </div>
+                  <div class="result-item">
+                    <span class="result-label">退出码:</span>
+                    <span :class="['result-value', { 'error-code': commandResult.exitCode !== 0 }]">
+                      {{ commandResult.exitCode }}
+                    </span>
+                  </div>
+                  <div class="result-item">
+                    <span class="result-label">执行时间:</span>
+                    <span class="result-value">{{ formatTime(commandResult.timestamp) }}</span>
+                  </div>
                 </div>
                 
-                <div class="tab-content">
-                  <div v-if="activeTab === 'output'">
-                    <pre v-if="commandResult.output" class="output-text">{{ commandResult.output }}</pre>
-                    <div v-else class="no-output">无标准输出</div>
+                <div class="mt-3">
+                  <div class="tabs">
+                    <button 
+                      :class="['tab-btn', { active: activeTab === 'output' }]" 
+                      @click="activeTab = 'output'"
+                    >
+                      标准输出
+                    </button>
+                    <button 
+                      :class="['tab-btn', { active: activeTab === 'error' }]" 
+                      @click="activeTab = 'error'"
+                    >
+                      错误输出
+                    </button>
                   </div>
-                  <div v-if="activeTab === 'error'">
-                    <pre v-if="commandResult.error" class="error-text">{{ commandResult.error }}</pre>
-                    <div v-else class="no-output">无错误输出</div>
+                  
+                  <div class="tab-content">
+                    <div v-if="activeTab === 'output'">
+                      <pre v-if="commandResult.output" class="output-text">{{ commandResult.output }}</pre>
+                      <div v-else class="no-output">无标准输出</div>
+                    </div>
+                    <div v-if="activeTab === 'error'">
+                      <pre v-if="commandResult.error" class="error-text">{{ commandResult.error }}</pre>
+                      <div v-else class="no-output">无错误输出</div>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </div>
-          </div>
-        </div>
-        
-        <!-- Emergency Steps -->
-        <div class="card mb-3">
-          <h3>应急处理步骤</h3>
-          <div class="steps">
-            <div class="step">
-              <div class="step-number">1</div>
-              <div class="step-content">
-                <h4>确认告警</h4>
-                <p>检查当前告警详情，确认告警的真实性和严重程度</p>
-              </div>
-            </div>
-            <div class="step">
-              <div class="step-number">2</div>
-              <div class="step-content">
-                <h4>定位问题</h4>
-                <p>根据告警类型和代理IP，登录对应服务器进行问题排查</p>
-              </div>
-            </div>
-            <div class="step">
-              <div class="step-number">3</div>
-              <div class="step-content">
-                <h4>临时处理</h4>
-                <div v-if="selectedAlert && selectedAlert.metricType === 'CPU'">
-                  <p><strong>CPU告警</strong>: 检查高CPU进程，必要时重启相关服务</p>
-                </div>
-                <div v-else-if="selectedAlert && selectedAlert.metricType === 'MEMORY'">
-                  <p><strong>内存告警</strong>: 检查内存使用情况，清理缓存或重启应用</p>
-                </div>
-                <div v-else>
-                  <p><strong>通用处理</strong>: 检查系统资源使用情况，查看应用日志，必要时重启服务</p>
-                </div>
-              </div>
-            </div>
-            <div class="step">
-              <div class="step-number">4</div>
-              <div class="step-content">
-                <h4>根因分析</h4>
-                <p>分析系统日志，找出问题根本原因</p>
-              </div>
-            </div>
-            <div class="step">
-              <div class="step-number">5</div>
-              <div class="step-content">
-                <h4>永久解决</h4>
-                <p>根据根因分析结果，实施永久性解决方案</p>
-              </div>
-            </div>
-            <div class="step">
-              <div class="step-number">6</div>
-              <div class="step-content">
-                <h4>验证恢复</h4>
-                <p>确认系统恢复正常，监控指标回到正常范围</p>
-              </div>
-            </div>
-            <div class="step">
-              <div class="step-number">7</div>
-              <div class="step-content">
-                <h4>记录总结</h4>
-                <p>记录问题处理过程和解决方案，更新知识库</p>
               </div>
             </div>
           </div>
@@ -380,6 +478,11 @@ export default {
     const maxDisplayPoints = ref(50) // Maximum points to display in emergency chart
     const activeTab = ref('output') // For tab switching in command result
     const chartCanvasRef = ref(null) // Ref for the chart canvas element
+    const emergencyKnowledge = ref(null) // Emergency knowledge base for the alert rule
+    const showCommandWindow = ref(false) // Command window collapsed by default
+    const executingCommand = ref('') // Track which command is being executed
+    const stepResults = ref({}) // Store results for each step
+    const stepResultTab = ref({}) // Track active tab for each step result
     
     // Computed properties
     const activeAlertsCount = computed(() => {
@@ -778,10 +881,23 @@ export default {
       return date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
     }
     
-    const openEmergencyDrawer = (alert) => {
+    const openEmergencyDrawer = async (alert) => {
       selectedAlert.value = alert
       metricViewMode.value = 'chart' // Default to chart view
       isEmergencyDrawerOpen.value = true
+      
+      // Load emergency knowledge for this alert's rule
+      try {
+        const response = await fetch(`/api/emergency/alert-rule/${alert.alertRuleId}`)
+        if (response.ok) {
+          emergencyKnowledge.value = await response.json()
+        } else {
+          emergencyKnowledge.value = null
+        }
+      } catch (error) {
+        console.error('Error loading emergency knowledge:', error)
+        emergencyKnowledge.value = null
+      }
       
       // Add a small delay to ensure the drawer is fully opened before loading data
       setTimeout(() => {
@@ -866,6 +982,79 @@ export default {
       renderChart()
     }
     
+    const findStepNumber = (stepId) => {
+      if (!emergencyKnowledge.value || !emergencyKnowledge.value.steps) return 0
+      const index = emergencyKnowledge.value.steps.findIndex(s => s.id === stepId)
+      return index >= 0 ? index + 1 : 0
+    }
+    
+    const executeStepCommand = async (command) => {
+      if (!selectedAlert.value || !command.trim()) return
+      
+      executingCommand.value = command
+      isExecutingCommand.value = true
+      
+      // Find the step index
+      const stepIndex = emergencyKnowledge.value.steps.findIndex(s => s.linuxCommand === command)
+      
+      try {
+        const response = await fetch(`/api/agents/${selectedAlert.value.agentId}/execute`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ command: command })
+        })
+        
+        if (response.ok) {
+          const result = await response.json()
+          stepResults.value[stepIndex] = result
+          stepResultTab.value[stepIndex] = 'output' // Default to output tab
+        } else {
+          stepResults.value[stepIndex] = {
+            error: `HTTP ${response.status}: ${response.statusText}`,
+            timestamp: Date.now(),
+            exitCode: -1
+          }
+          stepResultTab.value[stepIndex] = 'error'
+        }
+      } catch (error) {
+        stepResults.value[stepIndex] = {
+          error: `网络错误: ${error.message}`,
+          timestamp: Date.now(),
+          exitCode: -1
+        }
+        stepResultTab.value[stepIndex] = 'error'
+      } finally {
+        isExecutingCommand.value = false
+        executingCommand.value = ''
+      }
+    }
+    
+    const copyCommand = (command) => {
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(command).then(() => {
+          // Could show a toast notification here
+          console.log('Command copied to clipboard')
+        }).catch(err => {
+          console.error('Failed to copy:', err)
+        })
+      } else {
+        // Fallback for older browsers
+        const textArea = document.createElement('textarea')
+        textArea.value = command
+        document.body.appendChild(textArea)
+        textArea.select()
+        document.execCommand('copy')
+        document.body.removeChild(textArea)
+      }
+    }
+    
+    const clearStepResult = (index) => {
+      delete stepResults.value[index]
+      delete stepResultTab.value[index]
+    }
+    
     return {
       // Reactive data
       alerts,
@@ -884,6 +1073,11 @@ export default {
       maxDisplayPoints,
       activeTab,
       chartCanvasRef, // Add chartCanvasRef to returned values
+      emergencyKnowledge, // Add emergencyKnowledge to returned values
+      showCommandWindow, // Add showCommandWindow to returned values
+      executingCommand, // Add executingCommand to returned values
+      stepResults, // Add stepResults to returned values
+      stepResultTab, // Add stepResultTab to returned values
       
       // Computed properties
       activeAlertsCount,
@@ -907,7 +1101,11 @@ export default {
       clearCommandResult,
       filterAlerts,
       handleResize, // Add handleResize to returned values
-      refreshChart // Add refreshChart to returned values
+      refreshChart, // Add refreshChart to returned values
+      findStepNumber, // Add findStepNumber to returned values
+      executeStepCommand, // Add executeStepCommand to returned values
+      copyCommand, // Add copyCommand to returned values
+      clearStepResult // Add clearStepResult to returned values
     }
   }
 }
@@ -1574,5 +1772,306 @@ tbody tr:hover {
   color: #1976d2;
   font-size: 14px;
   white-space: nowrap;
+}
+
+/* Emergency Knowledge Styles */
+.knowledge-header {
+  margin-bottom: 20px;
+  padding: 15px;
+  background: #e3f2fd;
+  border-radius: 8px;
+  border-left: 4px solid #1976d2;
+}
+
+.knowledge-header h4 {
+  color: #1976d2;
+  font-size: 18px;
+  margin: 0 0 10px 0;
+  font-weight: 600;
+}
+
+.knowledge-description {
+  color: #000000;
+  font-size: 14px;
+  margin: 0;
+  line-height: 1.5;
+}
+
+.no-knowledge-hint {
+  background: #fff3e0;
+  border: 2px solid #ff9800;
+  border-radius: 8px;
+  padding: 15px;
+  color: #000000;
+  font-size: 14px;
+  margin-bottom: 20px;
+  font-weight: 500;
+}
+
+.step-command {
+  background: #f5f5f5;
+  border: 2px solid #e0e0e0;
+  border-radius: 6px;
+  padding: 12px;
+  margin-top: 10px;
+  position: relative;
+}
+
+.command-label {
+  color: #1976d2;
+  font-weight: 600;
+  font-size: 13px;
+  margin-bottom: 8px;
+}
+
+.command-text {
+  background: #263238;
+  color: #4caf50;
+  padding: 10px;
+  border-radius: 4px;
+  font-family: 'Courier New', monospace;
+  font-size: 13px;
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-all;
+  line-height: 1.5;
+}
+
+.btn-copy-command {
+  margin-top: 10px;
+  padding: 6px 12px;
+  background: #1976d2;
+  border: none;
+  border-radius: 4px;
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.btn-copy-command:hover {
+  background: #1565c0;
+  transform: translateY(-1px);
+  box-shadow: 0 3px 10px rgba(25, 118, 210, 0.3);
+}
+
+.step-dependency {
+  background: #fff3e0;
+  border: 1px solid #ff9800;
+  border-radius: 6px;
+  padding: 8px 12px;
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #e65100;
+}
+
+.dependency-icon {
+  font-size: 16px;
+}
+
+.step-notes {
+  background: #e3f2fd;
+  border: 1px solid #1976d2;
+  border-radius: 6px;
+  padding: 8px 12px;
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #000000;
+}
+
+.notes-icon {
+  font-size: 16px;
+}
+
+/* Collapsible Header */
+.collapsible-header {
+  cursor: pointer;
+  user-select: none;
+}
+
+.collapsible-header:hover {
+  background: #f5f9ff;
+}
+
+.collapse-icon {
+  display: inline-block;
+  margin-right: 8px;
+  font-size: 12px;
+  transition: transform 0.3s ease;
+}
+
+.collapsible-content {
+  animation: slideDown 0.3s ease;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    max-height: 0;
+  }
+  to {
+    opacity: 1;
+    max-height: 2000px;
+  }
+}
+
+/* Command Actions */
+.command-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.btn-execute-command {
+  padding: 8px 16px;
+  background: #4caf50;
+  border: none;
+  border-radius: 6px;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.btn-execute-command:hover:not(:disabled) {
+  background: #43a047;
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(76, 175, 80, 0.3);
+}
+
+.btn-execute-command:disabled {
+  background: #a5d6a7;
+  cursor: not-allowed;
+}
+
+.btn-copy-command {
+  padding: 8px 16px;
+  background: #2196f3;
+  border: none;
+  border-radius: 6px;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.btn-copy-command:hover {
+  background: #1976d2;
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(33, 150, 243, 0.3);
+}
+
+/* Step Result Styles */
+.step-result {
+  background: #f5f5f5;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 15px;
+  margin-top: 15px;
+}
+
+.result-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.result-title {
+  color: #1976d2;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.btn-clear-result {
+  background: #f44336;
+  border: none;
+  color: white;
+  font-size: 20px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.btn-clear-result:hover {
+  background: #d32f2f;
+  transform: rotate(90deg);
+}
+
+.result-summary {
+  padding: 8px 12px;
+  background: #fff;
+  border-radius: 4px;
+  margin-bottom: 10px;
+  font-size: 13px;
+}
+
+.exit-code {
+  font-weight: 600;
+  color: #4caf50;
+}
+
+.exit-code.error-code {
+  color: #f44336;
+}
+
+.result-time {
+  color: #666;
+  font-size: 12px;
+}
+
+.result-tabs {
+  display: flex;
+  gap: 5px;
+  margin-bottom: 10px;
+}
+
+.result-tab {
+  padding: 6px 12px;
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  color: #666;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.result-tab:hover {
+  background: #f5f5f5;
+}
+
+.result-tab.active {
+  background: #1976d2;
+  color: #fff;
+  border-color: #1976d2;
+}
+
+.result-content {
+  background: #fff;
+  border-radius: 4px;
+  padding: 10px;
+}
+
+.result-content .output-text,
+.result-content .error-text {
+  max-height: 150px;
+  font-size: 11px;
 }
 </style>

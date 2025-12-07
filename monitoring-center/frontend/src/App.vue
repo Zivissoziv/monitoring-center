@@ -16,6 +16,9 @@
           <button @click="activeTab = 'alerts'" :class="{ active: activeTab === 'alerts' }">
             <span class="icon">🔔</span> 告警管理
           </button>
+          <button @click="activeTab = 'emergency'" :class="{ active: activeTab === 'emergency' }">
+            <span class="icon">📚</span> 应急知识库
+          </button>
         </nav>
       </div>
     </header>
@@ -25,6 +28,7 @@
       <AgentManagement v-if="activeTab === 'agents'" />
       <MetricCollection v-if="activeTab === 'metrics'" />
       <AlertManagement v-if="activeTab === 'alerts'" />
+      <EmergencyKnowledge v-if="activeTab === 'emergency'" />
     </main>
   </div>
 </template>
@@ -34,6 +38,7 @@ import AgentManagement from './components/AgentManagement.vue'
 import MetricCollection from './components/MetricCollection.vue'
 import AlertManagement from './components/AlertManagement.vue'
 import MonitoringDashboard from './components/MonitoringDashboard.vue'
+import EmergencyKnowledge from './components/EmergencyKnowledge.vue'
 
 export default {
   name: 'App',
@@ -41,7 +46,8 @@ export default {
     MonitoringDashboard,
     AgentManagement,
     MetricCollection,
-    AlertManagement
+    AlertManagement,
+    EmergencyKnowledge
   },
   data() {
     return {

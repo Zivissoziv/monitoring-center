@@ -401,6 +401,7 @@ tbody tr:hover {
   font-size: 13px;
   cursor: pointer;
   transition: all 0.3s ease;
+  margin-left: 5px;
 }
 
 .btn-danger:hover {
