@@ -4,6 +4,8 @@ import com.example.monitoring.agent.Agent;
 import com.example.monitoring.agent.AgentRepository;
 import com.example.monitoring.alert.AlertService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -24,12 +26,27 @@ public class MetricService {
         return metricRepository.findAll();
     }
     
+    // Add paginated method
+    public Page<Metric> getAllMetrics(Pageable pageable) {
+        return metricRepository.findAllByOrderByTimestampDesc(pageable);
+    }
+    
     public List<Metric> getMetricsByAgentId(Long agentId) {
         return metricRepository.findByAgentIdOrderByTimestampDesc(agentId);
     }
     
+    // Add paginated method
+    public Page<Metric> getMetricsByAgentId(Long agentId, Pageable pageable) {
+        return metricRepository.findByAgentIdOrderByTimestampDesc(agentId, pageable);
+    }
+    
     public List<Metric> getMetricsByAgentIdAndType(Long agentId, String metricType) {
         return metricRepository.findByAgentIdAndMetricTypeOrderByTimestampDesc(agentId, metricType);
+    }
+    
+    // Add paginated method
+    public Page<Metric> getMetricsByAgentIdAndType(Long agentId, String metricType, Pageable pageable) {
+        return metricRepository.findByAgentIdAndMetricTypeOrderByTimestampDesc(agentId, metricType, pageable);
     }
     
     public Metric saveMetric(Metric metric) {

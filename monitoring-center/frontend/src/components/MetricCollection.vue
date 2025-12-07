@@ -28,7 +28,7 @@
         
         <div class="filter-group">
           <label>时间范围:</label>
-          <select v-model="timeRange" @change="filterMetrics" class="filter-select">
+          <select v-model="timeRange" @change="filterMetrics" class="filter-select" disabled>
             <option value="10">最近10条</option>
             <option value="20">最近20条</option>
             <option value="50">最近50条</option>
@@ -58,7 +58,7 @@
     <!-- Table View -->
     <div v-if="viewMode === 'table'" class="metric-view card">
       <h3>监控数据表格</h3>
-      <div v-if="filteredMetrics.length === 0" class="no-data-message">
+      <div v-if="paginatedMetrics.length === 0" class="no-data-message">
         <p>📊 暂无符合条件的监控数据</p>
       </div>
       <div v-else class="table-container">
@@ -82,6 +82,18 @@
             </tr>
           </tbody>
         </table>
+        
+        <!-- Pagination Controls -->
+        <div class="pagination-controls">
+          <el-pagination
+            v-model:current-page="currentPage"
+            v-model:page-size="pageSize"
+            :total="totalMetrics"
+            layout="prev, pager, next, jumper, ->, total"
+            background
+            @current-change="handlePageChange"
+          />
+        </div>
       </div>
     </div>
     
@@ -91,12 +103,16 @@
       <div v-if="filteredMetrics.length === 0" class="no-data-message">
         <p>📊 暂无符合条件的监控数据</p>
       </div>
-      <div v-else class="chart-container-wrapper">
-        <div v-if="filteredMetrics.length > 100" class="chart-warning">
-          <p>ℹ️ 数据点较多({{ filteredMetrics.length }}个)，图表已自动采样以提高性能，仅显示最新100个数据点</p>
-        </div>
-        <div class="chart-container">
-          <canvas ref="metricsChart"></canvas>
+      <div v-else class="charts-grid">
+        <!-- Individual charts for each metric type and agent combination -->
+        <div 
+          v-for="(chartData, index) in individualCharts" 
+          :key="index" 
+          class="chart-item"
+        >
+          <div class="chart-container">
+            <canvas :ref="`chart-${index}`"></canvas>
+          </div>
         </div>
       </div>
     </div>
@@ -114,10 +130,12 @@ export default {
       filteredMetrics: [],
       selectedMetricType: 'ALL',
       selectedAgent: 'ALL',
-      timeRange: '100', // Increased default
+      timeRange: '100',
       viewMode: 'table', // 'table' or 'chart'
-      chartInstance: null,
-      interval: null
+      chartInstances: [],
+      currentPage: 1,
+      pageSize: 10,
+      totalMetrics: 0
     }
   },
   computed: {
@@ -126,267 +144,268 @@ export default {
       return agentIds.sort((a, b) => a - b)
     },
     paginatedMetrics() {
-      return this.filteredMetrics.slice(0, parseInt(this.timeRange))
+      // This will now be populated from backend pagination
+      return this.filteredMetrics
+    },
+    individualCharts() {
+      // Prepare data for individual charts
+      const charts = []
+      
+      if (this.selectedMetricType === 'ALL') {
+        // Create separate charts for CPU and Memory
+        const cpuMetrics = this.filteredMetrics.filter(m => m.metricType === 'CPU')
+        const memoryMetrics = this.filteredMetrics.filter(m => m.metricType === 'MEMORY')
+        
+        if (cpuMetrics.length > 0) {
+          charts.push({
+            type: 'CPU',
+            data: cpuMetrics,
+            title: 'CPU使用率趋势'
+          })
+        }
+        
+        if (memoryMetrics.length > 0) {
+          charts.push({
+            type: 'MEMORY',
+            data: memoryMetrics,
+            title: '内存使用率趋势'
+          })
+        }
+      } else {
+        // Group by agent for the selected metric type
+        const agentIds = [...new Set(this.filteredMetrics.map(m => m.agentId))]
+        agentIds.forEach(agentId => {
+          const agentMetrics = this.filteredMetrics.filter(m => m.agentId === agentId)
+          if (agentMetrics.length > 0) {
+            charts.push({
+              type: this.selectedMetricType,
+              agentId: agentId,
+              data: agentMetrics,
+              title: `代理${agentId} - ${this.getMetricTypeName(this.selectedMetricType)}趋势`
+            })
+          }
+        })
+      }
+      
+      return charts
     }
   },
   watch: {
     viewMode(newMode) {
       if (newMode === 'chart') {
         this.$nextTick(() => {
-          this.renderChart()
+          this.renderIndividualCharts()
         })
       }
     },
     filteredMetrics() {
       if (this.viewMode === 'chart') {
         this.$nextTick(() => {
-          this.renderChart()
+          this.renderIndividualCharts()
         })
       }
     }
   },
   mounted() {
     this.loadAllData()
-    // Auto refresh every 10 seconds
-    this.interval = setInterval(() => {
-      this.loadAllData()
-    }, 10000)
+    // Removed auto-refresh
   },
   beforeUnmount() {
-    if (this.interval) {
-      clearInterval(this.interval)
-    }
-    if (this.chartInstance) {
-      this.chartInstance.destroy()
-    }
+    // Clean up chart instances
+    this.chartInstances.forEach(chart => {
+      if (chart) {
+        chart.destroy()
+      }
+    })
   },
   methods: {
     async loadAllData() {
       try {
-        // Load metrics
-        const metricsResponse = await fetch('/api/metrics')
-        this.metrics = await metricsResponse.json()
-        // Sort by timestamp descending (newest first)
-        this.metrics.sort((a, b) => b.timestamp - a.timestamp)
-        
+        // Load paginated metrics
+        await this.loadPaginatedData()
         this.filterMetrics()
       } catch (error) {
         console.error('Error loading data:', error)
       }
     },
     
-    filterMetrics() {
-      let filtered = this.metrics
-      
-      // Filter by metric type
-      if (this.selectedMetricType !== 'ALL') {
-        filtered = filtered.filter(m => m.metricType === this.selectedMetricType)
-      }
-      
-      // Filter by agent
-      if (this.selectedAgent !== 'ALL') {
-        filtered = filtered.filter(m => m.agentId === parseInt(this.selectedAgent))
-      }
-      
-      this.filteredMetrics = filtered
-    },
-    
-    renderChart() {
-      if (!this.$refs.metricsChart) return
-      
+    async loadPaginatedData() {
       try {
-        // Destroy existing chart
-        if (this.chartInstance) {
-          this.chartInstance.destroy()
+        const page = this.currentPage - 1 // Backend uses 0-based indexing
+        const size = this.pageSize
+        
+        let url = `/api/metrics/paginated?page=${page}&size=${size}`
+        
+        // Add filters if applicable
+        if (this.selectedAgent !== 'ALL') {
+          url = `/api/metrics/agent/${this.selectedAgent}/paginated?page=${page}&size=${size}`
         }
         
-        const ctx = this.$refs.metricsChart.getContext('2d')
+        if (this.selectedMetricType !== 'ALL' && this.selectedAgent !== 'ALL') {
+          url = `/api/metrics/agent/${this.selectedAgent}/type/${this.selectedMetricType}/paginated?page=${page}&size=${size}`
+        } else if (this.selectedMetricType !== 'ALL' && this.selectedAgent === 'ALL') {
+          // For metric type filter without agent, we need to load all and filter on frontend
+          // This is a limitation of our current backend API
+          const response = await fetch('/api/metrics')
+          const allMetrics = await response.json()
+          this.metrics = allMetrics.filter(m => m.metricType === this.selectedMetricType)
+          this.totalMetrics = this.metrics.length
+          return
+        }
         
-        // Prepare data for chart - limit to 100 data points for performance
-        const chartData = this.prepareChartData()
+        const response = await fetch(url)
+        const data = await response.json()
         
-        this.chartInstance = new Chart(ctx, {
-          type: 'line',
-          data: chartData,
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-              title: {
-                display: true,
-                text: this.getChartTitle(),
-                font: {
-                  size: 16,
-                  weight: 'bold'
+        // Handle paginated response
+        if (data.content) {
+          this.filteredMetrics = data.content
+          this.totalMetrics = data.totalElements
+        } else {
+          // Fallback if pagination isn't supported
+          this.filteredMetrics = data
+          this.totalMetrics = data.length
+        }
+        
+        // Sort by timestamp descending (newest first)
+        this.filteredMetrics.sort((a, b) => b.timestamp - a.timestamp)
+      } catch (error) {
+        console.error('Error loading paginated data:', error)
+      }
+    },
+    
+    filterMetrics() {
+      // Filtering is now mostly handled by backend pagination
+      // But we still need to handle some frontend filtering for edge cases
+      this.currentPage = 1 // Reset to first page when filters change
+      this.loadPaginatedData()
+    },
+    
+    handlePageChange(newPage) {
+      this.currentPage = newPage
+      this.loadPaginatedData()
+    },
+    
+    renderIndividualCharts() {
+      // Clean up existing chart instances
+      this.chartInstances.forEach(chart => {
+        if (chart) {
+          chart.destroy()
+        }
+      })
+      this.chartInstances = []
+      
+      // Render each individual chart
+      this.individualCharts.forEach((chartConfig, index) => {
+        this.$nextTick(() => {
+          const canvasRef = this.$refs[`chart-${index}`]
+          if (canvasRef && canvasRef[0]) {
+            try {
+              const ctx = canvasRef[0].getContext('2d')
+              
+              // Prepare data for chart - limit to 100 data points for performance
+              const maxDataPoints = 100
+              let data = chartConfig.data.slice().reverse() // Reverse to show oldest to newest
+              
+              // Sample data if there are too many points
+              if (data.length > maxDataPoints) {
+                const step = Math.ceil(data.length / maxDataPoints)
+                data = data.filter((_, i) => i % step === 0)
+              }
+              
+              const labels = data.map(m => this.formatTimeShort(m.timestamp))
+              const values = data.map(m => m.value)
+              
+              const chartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                  labels: labels,
+                  datasets: [{
+                    label: chartConfig.title,
+                    data: values,
+                    borderColor: chartConfig.type === 'CPU' ? '#c62828' : '#1976d2',
+                    backgroundColor: chartConfig.type === 'CPU' ? 'rgba(198, 40, 40, 0.1)' : 'rgba(25, 118, 210, 0.1)',
+                    borderWidth: 2,
+                    tension: 0.4,
+                    pointRadius: data.length > 50 ? 0 : 2,
+                    pointHoverRadius: 4
+                  }]
                 },
-                color: '#1976d2'
-              },
-              legend: {
-                display: true,
-                position: 'top',
-                labels: {
-                  color: '#000000',
-                  font: {
-                    size: 12,
-                    weight: '600'
+                options: {
+                  responsive: true,
+                  maintainAspectRatio: false,
+                  plugins: {
+                    title: {
+                      display: true,
+                      text: chartConfig.title,
+                      font: {
+                        size: 16,
+                        weight: 'bold'
+                      },
+                      color: '#1976d2'
+                    },
+                    legend: {
+                      display: true,
+                      position: 'top',
+                      labels: {
+                        color: '#000000',
+                        font: {
+                          size: 12,
+                          weight: '600'
+                        }
+                      }
+                    },
+                    tooltip: {
+                      mode: 'index',
+                      intersect: false,
+                      backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                      titleColor: '#ffffff',
+                      bodyColor: '#ffffff',
+                      borderColor: '#1976d2',
+                      borderWidth: 1
+                    }
+                  },
+                  scales: {
+                    y: {
+                      beginAtZero: true,
+                      max: 100,
+                      ticks: {
+                        callback: function(value) {
+                          return value + '%'
+                        },
+                        color: '#000000',
+                        font: {
+                          weight: '600'
+                        }
+                      },
+                      grid: {
+                        color: 'rgba(0, 0, 0, 0.1)'
+                      }
+                    },
+                    x: {
+                      ticks: {
+                        color: '#000000',
+                        font: {
+                          weight: '600'
+                        },
+                        maxTicksLimit: 15,
+                        maxRotation: 45,
+                        minRotation: 45
+                      },
+                      grid: {
+                        color: 'rgba(0, 0, 0, 0.1)'
+                      }
+                    }
                   }
                 }
-              },
-              tooltip: {
-                mode: 'index',
-                intersect: false,
-                backgroundColor: 'rgba(0, 0, 0, 0.8)',
-                titleColor: '#ffffff',
-                bodyColor: '#ffffff',
-                borderColor: '#1976d2',
-                borderWidth: 1
-              }
-            },
-            scales: {
-              y: {
-                beginAtZero: true,
-                max: 100,
-                ticks: {
-                  callback: function(value) {
-                    return value + '%'
-                  },
-                  color: '#000000',
-                  font: {
-                    weight: '600'
-                  }
-                },
-                grid: {
-                  color: 'rgba(0, 0, 0, 0.1)'
-                }
-              },
-              x: {
-                ticks: {
-                  color: '#000000',
-                  font: {
-                    weight: '600'
-                  },
-                  maxTicksLimit: 15, // Increased limit
-                  maxRotation: 45,
-                  minRotation: 45
-                },
-                grid: {
-                  color: 'rgba(0, 0, 0, 0.1)'
-                }
-              }
+              })
+              
+              this.chartInstances.push(chartInstance)
+            } catch (error) {
+              console.error('Error rendering chart:', error)
             }
           }
         })
-      } catch (error) {
-        console.error('Error rendering chart:', error)
-        // Display error message to user
-        if (this.$refs.metricsChart) {
-          const ctx = this.$refs.metricsChart.getContext('2d')
-          ctx.clearRect(0, 0, this.$refs.metricsChart.width, this.$refs.metricsChart.height)
-          ctx.fillStyle = '#000000'
-          ctx.font = '16px Arial'
-          ctx.fillText('图表渲染失败，请刷新页面重试', 50, 50)
-        }
-      }
-    },
-    
-    prepareChartData() {
-      // Limit data points to prevent chart clutter (max 100 points)
-      const maxDataPoints = 100;
-      let data = this.paginatedMetrics.slice().reverse() // Reverse to show oldest to newest
-      
-      // Sample data if there are too many points
-      if (data.length > maxDataPoints) {
-        const step = Math.ceil(data.length / maxDataPoints);
-        data = data.filter((_, index) => index % step === 0);
-      }
-      
-      const labels = data.map(m => this.formatTimeShort(m.timestamp))
-      
-      // Group by metric type and agent
-      const datasets = []
-      
-      if (this.selectedMetricType === 'ALL') {
-        // Show both CPU and Memory
-        const cpuData = data.filter(m => m.metricType === 'CPU').map(m => m.value)
-        const memoryData = data.filter(m => m.metricType === 'MEMORY').map(m => m.value)
-        
-        if (cpuData.length > 0) {
-          datasets.push({
-            label: 'CPU使用率',
-            data: cpuData,
-            borderColor: '#c62828',
-            backgroundColor: 'rgba(198, 40, 40, 0.1)',
-            borderWidth: 2,
-            tension: 0.4,
-            pointRadius: data.length > 50 ? 0 : 2, // Hide points when too many data points
-            pointHoverRadius: 4
-          })
-        }
-        
-        if (memoryData.length > 0) {
-          datasets.push({
-            label: '内存使用率',
-            data: memoryData,
-            borderColor: '#1976d2',
-            backgroundColor: 'rgba(25, 118, 210, 0.1)',
-            borderWidth: 2,
-            tension: 0.4,
-            pointRadius: data.length > 50 ? 0 : 2, // Hide points when too many data points
-            pointHoverRadius: 4
-          })
-        }
-      } else {
-        // Show selected metric type, group by agent if needed
-        if (this.selectedAgent === 'ALL') {
-          // Show data for each agent separately
-          const agentIds = [...new Set(data.map(m => m.agentId))]
-          const colors = ['#c62828', '#1976d2', '#388e3c', '#f57c00', '#7b1fa2']
-          
-          agentIds.forEach((agentId, index) => {
-            const agentData = data.filter(m => m.agentId === agentId).map(m => m.value)
-            datasets.push({
-              label: `代理${agentId} - ${this.getMetricTypeName(this.selectedMetricType)}`,
-              data: agentData,
-              borderColor: colors[index % colors.length],
-              backgroundColor: colors[index % colors.length] + '20',
-              borderWidth: 2,
-              tension: 0.4,
-              pointRadius: data.length > 30 ? 0 : 2, // Hide points when too many data points
-              pointHoverRadius: 4
-            })
-          })
-        } else {
-          // Show data for selected agent
-          const values = data.map(m => m.value)
-          const color = this.selectedMetricType === 'CPU' ? '#c62828' : '#1976d2'
-          datasets.push({
-            label: `代理${this.selectedAgent} - ${this.getMetricTypeName(this.selectedMetricType)}`,
-            data: values,
-            borderColor: color,
-            backgroundColor: color + '20',
-            borderWidth: 2,
-            tension: 0.4,
-            pointRadius: data.length > 50 ? 0 : 2, // Hide points when too many data points
-            pointHoverRadius: 4
-          })
-        }
-      }
-      
-      return {
-        labels,
-        datasets
-      }
-    },
-    
-    getChartTitle() {
-      let title = '监控指标趋势'
-      if (this.selectedMetricType !== 'ALL') {
-        title = this.getMetricTypeName(this.selectedMetricType) + '趋势'
-      }
-      if (this.selectedAgent !== 'ALL') {
-        title += ` - 代理${this.selectedAgent}`
-      }
-      return title
+      })
     },
     
     getMetricTypeName(type) {
@@ -499,27 +518,29 @@ export default {
   border-color: #1976d2;
 }
 
-.chart-container-wrapper {
-  position: relative;
+.pagination-controls {
+  margin-top: 20px;
+  display: flex;
+  justify-content: center;
 }
 
-.chart-warning {
-  background: #fff3e0;
-  border: 1px solid #ffa726;
-  border-radius: 6px;
-  padding: 10px;
-  margin-bottom: 15px;
-  text-align: center;
-  color: #ef6c00;
-  font-weight: 600;
+.charts-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
+  margin-top: 20px;
+}
+
+.chart-item {
+  background: #f9f9f9;
+  border-radius: 8px;
+  padding: 15px;
 }
 
 .chart-container {
   position: relative;
-  height: 500px; /* Increased height */
-  padding: 20px;
-  background: #f9f9f9;
-  border-radius: 8px;
+  height: 300px;
+  width: 100%;
 }
 
 .metric-view table {
