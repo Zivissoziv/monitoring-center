@@ -20,12 +20,12 @@ public class AgentMetricConfigController {
     }
     
     @GetMapping("/agent/{agentId}")
-    public List<AgentMetricConfig> getConfigsByAgent(@PathVariable Long agentId) {
+    public List<AgentMetricConfig> getConfigsByAgent(@PathVariable String agentId) {
         return configService.getConfigsByAgent(agentId);
     }
     
     @GetMapping("/agent/{agentId}/enabled")
-    public List<AgentMetricConfig> getEnabledConfigsByAgent(@PathVariable Long agentId) {
+    public List<AgentMetricConfig> getEnabledConfigsByAgent(@PathVariable String agentId) {
         return configService.getEnabledConfigsByAgent(agentId);
     }
     
@@ -35,7 +35,7 @@ public class AgentMetricConfigController {
     }
     
     @PostMapping("/agent/{agentId}/initialize")
-    public ResponseEntity<String> initializeDefaultConfigs(@PathVariable Long agentId) {
+    public ResponseEntity<String> initializeDefaultConfigs(@PathVariable String agentId) {
         configService.initializeDefaultConfigsForAgent(agentId);
         return ResponseEntity.ok("Default metric configs initialized for agent " + agentId);
     }

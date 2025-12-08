@@ -31,38 +31,38 @@ public class MetricService {
         return metricRepository.findAllByOrderByTimestampDesc(pageable);
     }
     
-    public List<Metric> getMetricsByAgentId(Long agentId) {
+    public List<Metric> getMetricsByAgentId(String agentId) {
         return metricRepository.findByAgentIdOrderByTimestampDesc(agentId);
     }
     
     // Add paginated method
-    public Page<Metric> getMetricsByAgentId(Long agentId, Pageable pageable) {
+    public Page<Metric> getMetricsByAgentId(String agentId, Pageable pageable) {
         return metricRepository.findByAgentIdOrderByTimestampDesc(agentId, pageable);
     }
     
-    public List<Metric> getMetricsByAgentIdAndType(Long agentId, String metricType) {
+    public List<Metric> getMetricsByAgentIdAndType(String agentId, String metricType) {
         return metricRepository.findByAgentIdAndMetricTypeOrderByTimestampDesc(agentId, metricType);
     }
     
     // Add paginated method
-    public Page<Metric> getMetricsByAgentIdAndType(Long agentId, String metricType, Pageable pageable) {
+    public Page<Metric> getMetricsByAgentIdAndType(String agentId, String metricType, Pageable pageable) {
         return metricRepository.findByAgentIdAndMetricTypeOrderByTimestampDesc(agentId, metricType, pageable);
     }
     
     // Add time range query methods
-    public List<Metric> getMetricsByAgentIdAndTimeRange(Long agentId, Long startTime, Long endTime) {
+    public List<Metric> getMetricsByAgentIdAndTimeRange(String agentId, Long startTime, Long endTime) {
         return metricRepository.findByAgentIdAndTimestampBetweenOrderByTimestampDesc(agentId, startTime, endTime);
     }
     
-    public List<Metric> getMetricsByAgentIdAndTypeAndTimeRange(Long agentId, String metricType, Long startTime, Long endTime) {
+    public List<Metric> getMetricsByAgentIdAndTypeAndTimeRange(String agentId, String metricType, Long startTime, Long endTime) {
         return metricRepository.findByAgentIdAndMetricTypeAndTimestampBetweenOrderByTimestampDesc(agentId, metricType, startTime, endTime);
     }
     
-    public Page<Metric> getMetricsByAgentIdAndTimeRange(Long agentId, Long startTime, Long endTime, Pageable pageable) {
+    public Page<Metric> getMetricsByAgentIdAndTimeRange(String agentId, Long startTime, Long endTime, Pageable pageable) {
         return metricRepository.findByAgentIdAndTimestampBetweenOrderByTimestampDesc(agentId, startTime, endTime, pageable);
     }
     
-    public Page<Metric> getMetricsByAgentIdAndTypeAndTimeRange(Long agentId, String metricType, Long startTime, Long endTime, Pageable pageable) {
+    public Page<Metric> getMetricsByAgentIdAndTypeAndTimeRange(String agentId, String metricType, Long startTime, Long endTime, Pageable pageable) {
         return metricRepository.findByAgentIdAndMetricTypeAndTimestampBetweenOrderByTimestampDesc(agentId, metricType, startTime, endTime, pageable);
     }
     

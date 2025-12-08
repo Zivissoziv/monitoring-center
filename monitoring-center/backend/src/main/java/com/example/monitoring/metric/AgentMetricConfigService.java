@@ -19,15 +19,15 @@ public class AgentMetricConfigService {
         return configRepository.findAll();
     }
     
-    public List<AgentMetricConfig> getConfigsByAgent(Long agentId) {
+    public List<AgentMetricConfig> getConfigsByAgent(String agentId) {
         return configRepository.findByAgentId(agentId);
     }
     
-    public List<AgentMetricConfig> getEnabledConfigsByAgent(Long agentId) {
+    public List<AgentMetricConfig> getEnabledConfigsByAgent(String agentId) {
         return configRepository.findByAgentIdAndEnabled(agentId, true);
     }
     
-    public Optional<AgentMetricConfig> getConfig(Long agentId, String metricName) {
+    public Optional<AgentMetricConfig> getConfig(String agentId, String metricName) {
         return configRepository.findByAgentIdAndMetricName(agentId, metricName);
     }
     
@@ -53,7 +53,7 @@ public class AgentMetricConfigService {
      * Initialize default metric configs for an agent
      * Creates configs for all enabled metric definitions
      */
-    public void initializeDefaultConfigsForAgent(Long agentId) {
+    public void initializeDefaultConfigsForAgent(String agentId) {
         List<MetricDefinition> enabledDefinitions = definitionRepository.findByEnabled(true);
         
         for (MetricDefinition definition : enabledDefinitions) {
@@ -71,7 +71,7 @@ public class AgentMetricConfigService {
     /**
      * Get effective collection interval for a metric on an agent
      */
-    public int getEffectiveInterval(Long agentId, String metricName) {
+    public int getEffectiveInterval(String agentId, String metricName) {
         Optional<AgentMetricConfig> config = configRepository
                 .findByAgentIdAndMetricName(agentId, metricName);
         
@@ -88,7 +88,7 @@ public class AgentMetricConfigService {
     /**
      * Update last collection time for a metric
      */
-    public void updateLastCollectionTime(Long agentId, String metricName) {
+    public void updateLastCollectionTime(String agentId, String metricName) {
         Optional<AgentMetricConfig> config = configRepository
                 .findByAgentIdAndMetricName(agentId, metricName);
         

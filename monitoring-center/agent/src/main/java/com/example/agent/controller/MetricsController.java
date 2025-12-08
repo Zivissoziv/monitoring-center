@@ -1,5 +1,6 @@
 package com.example.agent.controller;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -10,6 +11,7 @@ import java.io.InputStreamReader;
 import java.util.HashMap;
 import java.util.Map;
 
+@Slf4j
 @RestController
 public class MetricsController {
 
@@ -82,7 +84,7 @@ public class MetricsController {
             }
             
         } catch (Exception e) {
-            System.err.println("Error getting memory usage: " + e.getMessage());
+            log.error("Error getting memory usage: {}", e.getMessage());
         }
         
         // Fallback to a more realistic dummy value for demonstration

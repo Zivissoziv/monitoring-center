@@ -1,5 +1,6 @@
 package com.example.monitoring.alert;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -7,6 +8,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.Map;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/alerts")
 @CrossOrigin(origins = "*")
@@ -34,14 +36,14 @@ public class AlertMonitorController {
     public ResponseEntity<Alert> acknowledgeAlert(
             @PathVariable Long id,
             @RequestBody Map<String, String> request) {
-        System.out.println("[API] POST /api/alerts/" + id + "/acknowledge - Acknowledging alert");
+        log.info("POST /api/alerts/{}/acknowledge", id);
         try {
             String acknowledgedBy = request.getOrDefault("acknowledgedBy", "System");
             Alert alert = alertService.acknowledgeAlert(id, acknowledgedBy);
-            System.out.println("[API] POST /api/alerts/" + id + "/acknowledge - Success");
+            log.info("POST /api/alerts/{}/acknowledge - Success", id);
             return ResponseEntity.ok(alert);
         } catch (RuntimeException e) {
-            System.out.println("[API] POST /api/alerts/" + id + "/acknowledge - Failed: " + e.getMessage());
+            log.error("POST /api/alerts/{}/acknowledge - Failed: {}", id, e.getMessage());
             return ResponseEntity.notFound().build();
         }
     }
@@ -50,27 +52,27 @@ public class AlertMonitorController {
     public ResponseEntity<Alert> resolveAlert(
             @PathVariable Long id,
             @RequestBody Map<String, String> request) {
-        System.out.println("[API] POST /api/alerts/" + id + "/resolve - Resolving alert");
+        log.info("POST /api/alerts/{}/resolve", id);
         try {
             String resolveNote = request.getOrDefault("resolveNote", "");
             Alert alert = alertService.resolveAlert(id, resolveNote);
-            System.out.println("[API] POST /api/alerts/" + id + "/resolve - Success");
+            log.info("POST /api/alerts/{}/resolve - Success", id);
             return ResponseEntity.ok(alert);
         } catch (RuntimeException e) {
-            System.out.println("[API] POST /api/alerts/" + id + "/resolve - Failed: " + e.getMessage());
+            log.error("POST /api/alerts/{}/resolve - Failed: {}", id, e.getMessage());
             return ResponseEntity.notFound().build();
         }
     }
     
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteAlert(@PathVariable Long id) {
-        System.out.println("[API] DELETE /api/alerts/" + id + " - Deleting alert");
+        log.info("DELETE /api/alerts/{}", id);
         try {
             alertService.deleteAlert(id);
-            System.out.println("[API] DELETE /api/alerts/" + id + " - Success");
+            log.info("DELETE /api/alerts/{} - Success", id);
             return ResponseEntity.noContent().build();
         } catch (RuntimeException e) {
-            System.out.println("[API] DELETE /api/alerts/" + id + " - Failed: " + e.getMessage());
+            log.error("DELETE /api/alerts/{} - Failed: {}", id, e.getMessage());
             return ResponseEntity.notFound().build();
         }
     }

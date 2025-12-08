@@ -13,9 +13,9 @@ public interface AlertRepository extends JpaRepository<Alert, Long> {
     
     List<Alert> findByStatusOrderByLastTriggeredAtDesc(String status);
     
-    Optional<Alert> findByAlertRuleIdAndAgentId(Long alertRuleId, Long agentId);
+    Optional<Alert> findByAlertRuleIdAndAgentId(Long alertRuleId, String agentId);
     
-    List<Alert> findByAgentId(Long agentId);
+    List<Alert> findByAgentId(String agentId);
     
     List<Alert> findBySeverity(String severity);
 }

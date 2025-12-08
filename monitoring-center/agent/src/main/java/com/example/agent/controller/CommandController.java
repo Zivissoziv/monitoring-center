@@ -1,5 +1,6 @@
 package com.example.agent.controller;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
@@ -9,6 +10,7 @@ import java.io.InputStreamReader;
 import java.util.HashMap;
 import java.util.Map;
 
+@Slf4j
 @RestController
 public class CommandController {
 
@@ -23,8 +25,8 @@ public class CommandController {
             return errorResponse;
         }
         
-        System.out.println("[COMMAND] Executing: " + command);
-        System.out.println("[COMMAND] OS: " + System.getProperty("os.name"));
+        log.info("Executing command: {}", command);
+        log.debug("OS: {}", System.getProperty("os.name"));
         
         try {
             // Detect OS and use appropriate shell
@@ -34,11 +36,11 @@ public class CommandController {
             if (os.contains("win")) {
                 // Windows: use cmd.exe /c
                 processBuilder = new ProcessBuilder("cmd.exe", "/c", command);
-                System.out.println("[COMMAND] Using Windows shell");
+                log.debug("Using Windows shell");
             } else {
                 // Linux/Unix: use /bin/bash -c (bash is more feature-rich than sh)
                 processBuilder = new ProcessBuilder("/bin/bash", "-c", command);
-                System.out.println("[COMMAND] Using bash shell");
+                log.debug("Using bash shell");
             }
             
             // Redirect error stream if needed for debugging
@@ -82,18 +84,16 @@ public class CommandController {
             response.put("timestamp", System.currentTimeMillis());
             
             if (exitCode == 0) {
-                System.out.println("[COMMAND] Completed successfully");
-                System.out.println("[COMMAND] Output: [" + finalOutput + "]");
-                System.out.println("[COMMAND] Output length: " + finalOutput.length());
+                log.info("Command completed successfully, output length: {}", finalOutput.length());
+                log.debug("Output: {}", finalOutput);
             } else {
-                System.err.println("[COMMAND] Failed with exit code: " + exitCode);
-                System.err.println("[COMMAND] Stdout: [" + finalOutput + "]");
-                System.err.println("[COMMAND] Stderr: [" + finalError + "]");
+                log.error("Command failed with exit code: {}", exitCode);
+                log.error("Stdout: {}", finalOutput);
+                log.error("Stderr: {}", finalError);
             }
             return response;
         } catch (Exception e) {
-            System.err.println("[COMMAND] Error executing command: " + e.getMessage());
-            e.printStackTrace();
+            log.error("Error executing command: {}", e.getMessage(), e);
             
             Map<String, Object> errorResponse = new HashMap<>();
             errorResponse.put("error", "Error executing command: " + e.getMessage());

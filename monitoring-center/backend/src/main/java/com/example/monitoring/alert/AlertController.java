@@ -1,11 +1,13 @@
 package com.example.monitoring.alert;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/alerts")
 @CrossOrigin(origins = "*")
@@ -31,9 +33,9 @@ private AlertService alertService;
     
     @PostMapping("/rules")
     public AlertRule createAlertRule(@RequestBody AlertRule alertRule) {
-        System.out.println("[API] POST /api/alerts/rules - Creating alert rule: " + alertRule.getName());
+        log.info("POST /api/alerts/rules - Creating alert rule: {}", alertRule.getName());
         AlertRule result = alertService.createAlertRule(alertRule);
-        System.out.println("[API] POST /api/alerts/rules - Success");
+        log.info("POST /api/alerts/rules - Success");
         return result;
     }
     

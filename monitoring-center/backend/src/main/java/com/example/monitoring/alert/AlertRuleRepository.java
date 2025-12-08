@@ -7,7 +7,8 @@ import java.util.List;
 
 @Repository
 public interface AlertRuleRepository extends JpaRepository<AlertRule, Long> {
+    List<AlertRule> findByEnabled(boolean enabled);
     List<AlertRule> findByEnabledTrue();
-    List<AlertRule> findByAgentIdAndEnabledTrue(Long agentId);
+    List<AlertRule> findByAgentIdAndEnabledTrue(String agentId);
     List<AlertRule> findByMetricTypeAndEnabledTrue(String metricType);
 }

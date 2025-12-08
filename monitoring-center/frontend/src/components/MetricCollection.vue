@@ -13,9 +13,9 @@
         </el-form-item>
         
         <el-form-item label="代理">
-          <el-select v-model="selectedAgent" @change="filterMetrics" placeholder="选择代理" style="width: 150px">
+          <el-select v-model="selectedAgent" @change="filterMetrics" placeholder="选择代理" style="width: 200px">
             <el-option label="全部代理" value="ALL" />
-            <el-option v-for="agentId in uniqueAgentIds" :key="agentId" :label="`代理 ${agentId}`" :value="agentId" />
+            <el-option v-for="agent in sortedAgents" :key="agent.id" :label="agent.name" :value="agent.id" />
           </el-select>
         </el-form-item>
         
@@ -66,7 +66,11 @@
       </template>
       <el-table :data="paginatedMetrics" stripe style="width: 100%">
         <el-table-column prop="id" label="ID" width="80" />
-        <el-table-column prop="agentId" label="代理ID" width="100" />
+        <el-table-column label="代理" width="150">
+          <template #default="scope">
+            {{ getAgentName(scope.row.agentId) }}
+          </template>
+        </el-table-column>
         <el-table-column label="指标类型" width="150">
           <template #default="scope">
             <el-tag :type="scope.row.metricType === 'CPU' ? 'danger' : 'primary'" size="small">
@@ -142,6 +146,7 @@ export default {
       metrics: [],
       filteredMetrics: [],
       metricDefinitions: [],
+      agents: [],
       loading: false,
       selectedMetricType: 'ALL',
       selectedAgent: 'ALL',
@@ -154,9 +159,11 @@ export default {
     }
   },
   computed: {
-    uniqueAgentIds() {
+    sortedAgents() {
+      // Get unique agents from metrics
       const agentIds = [...new Set(this.metrics.map(m => m.agentId))]
-      return agentIds.sort((a, b) => a - b)
+      const uniqueAgents = this.agents.filter(a => agentIds.includes(a.id))
+      return uniqueAgents.sort((a, b) => a.name.localeCompare(b.name))
     },
     paginatedMetrics() {
       // This will now be populated from backend pagination
@@ -196,7 +203,7 @@ export default {
               type: this.selectedMetricType,
               agentId: agentId,
               data: agentMetrics,
-              title: `代理${agentId} - ${this.getMetricTypeName(this.selectedMetricType)}趋势`
+              title: `${this.getAgentName(agentId)} - ${this.getMetricTypeName(this.selectedMetricType)}趋势`
             })
           }
         })
@@ -222,6 +229,7 @@ export default {
     }
   },
   mounted() {
+    this.loadAgents()
     this.loadMetricDefinitions()
     this.loadAllData()
     // Removed auto-refresh
@@ -235,6 +243,15 @@ export default {
     })
   },
   methods: {
+    async loadAgents() {
+      try {
+        const response = await fetch('/api/agents')
+        this.agents = await response.json()
+      } catch (error) {
+        console.error('Error loading agents:', error)
+      }
+    },
+    
     async loadMetricDefinitions() {
       try {
         const response = await fetch('/api/metric-definitions/enabled')
@@ -516,6 +533,11 @@ export default {
     formatTimeShort(timestamp) {
       const date = new Date(timestamp)
       return date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+    },
+    
+    getAgentName(agentId) {
+      const agent = this.agents.find(a => a.id === agentId)
+      return agent ? agent.name : agentId
     }
   }
 }

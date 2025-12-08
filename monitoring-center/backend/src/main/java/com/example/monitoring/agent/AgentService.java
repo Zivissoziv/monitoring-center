@@ -7,6 +7,7 @@ import com.example.monitoring.metric.MetricDefinition;
 import com.example.monitoring.metric.MetricDefinitionService;
 import com.example.monitoring.metric.AgentMetricConfig;
 import com.example.monitoring.metric.AgentMetricConfigService;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -18,6 +19,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+@Slf4j
 @Service
 public class AgentService {
     
@@ -42,7 +44,7 @@ public class AgentService {
         return agentRepository.findAll();
     }
     
-    public Optional<Agent> getAgentById(Long id) {
+    public Optional<Agent> getAgentById(String id) {
         return agentRepository.findById(id);
     }
     
@@ -60,7 +62,7 @@ public class AgentService {
         return savedAgent;
     }
     
-    public Agent updateAgent(Long id, Agent agentDetails) {
+    public Agent updateAgent(String id, Agent agentDetails) {
         Agent agent = agentRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Agent not found with id: " + id));
         
@@ -72,7 +74,7 @@ public class AgentService {
         return agentRepository.save(agent);
     }
     
-    public void deleteAgent(Long id) {
+    public void deleteAgent(String id) {
         Agent agent = agentRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Agent not found with id: " + id));
         
@@ -101,7 +103,7 @@ public class AgentService {
     /**
      * Collect metrics from agent using custom metric definitions
      */
-    public void collectMetricsFromAgent(Long agentId) {
+    public void collectMetricsFromAgent(String agentId) {
         Agent agent = agentRepository.findById(agentId)
                 .orElseThrow(() -> new RuntimeException("Agent not found with id: " + agentId));
         
@@ -134,16 +136,15 @@ public class AgentService {
                 
                 // Check for errors
                 if (result.containsKey("error") && result.get("error") != null && !result.get("error").toString().isEmpty()) {
-                    System.err.println("Failed to collect metric " + config.getMetricName() + 
-                                     " from agent " + agentId + ": " + result.get("error"));
+                    log.error("Failed to collect metric {} from agent {}: {}", 
+                            config.getMetricName(), agentId, result.get("error"));
                     continue;
                 }
                 
                 // Check exit code
                 if (result.containsKey("exitCode") && !Integer.valueOf(0).equals(result.get("exitCode"))) {
-                    System.err.println("Failed to collect metric " + config.getMetricName() + 
-                                     " from agent " + agentId + ": Command exited with code " + result.get("exitCode") +
-                                     ", stderr: " + result.get("error"));
+                    log.error("Failed to collect metric {} from agent {}: Command exited with code {}, stderr: {}",
+                            config.getMetricName(), agentId, result.get("exitCode"), result.get("error"));
                     continue;
                 }
                 
@@ -172,8 +173,8 @@ public class AgentService {
                 agentRepository.save(agent);
                 
             } catch (Exception e) {
-                System.err.println("Error collecting metric " + config.getMetricName() + 
-                                 " from agent " + agentId + ": " + e.getMessage());
+                log.error("Error collecting metric {} from agent {}: {}", 
+                        config.getMetricName(), agentId, e.getMessage());
             }
         }
     }
@@ -193,7 +194,7 @@ public class AgentService {
     /**
      * Execute command on agent
      */
-    public Map<String, Object> executeCommandOnAgent(Long agentId, String command) {
+    public Map<String, Object> executeCommandOnAgent(String agentId, String command) {
         Agent agent = agentRepository.findById(agentId)
                 .orElseThrow(() -> new RuntimeException("Agent not found with id: " + agentId));
         

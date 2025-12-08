@@ -1,5 +1,6 @@
 package com.example.monitoring.metric;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -9,6 +10,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/metrics")
 @CrossOrigin(origins = "*")
@@ -32,14 +34,14 @@ public class MetricController {
     }
     
     @GetMapping("/agent/{agentId}")
-    public List<Metric> getMetricsByAgentId(@PathVariable Long agentId) {
+    public List<Metric> getMetricsByAgentId(@PathVariable String agentId) {
         return metricService.getMetricsByAgentId(agentId);
     }
     
     // Add paginated endpoint
     @GetMapping("/agent/{agentId}/paginated")
     public Page<Metric> getMetricsByAgentIdPaginated(
-            @PathVariable Long agentId,
+            @PathVariable String agentId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
         Pageable pageable = PageRequest.of(page, size);
@@ -47,14 +49,14 @@ public class MetricController {
     }
     
     @GetMapping("/agent/{agentId}/type/{metricType}")
-    public List<Metric> getMetricsByAgentIdAndType(@PathVariable Long agentId, @PathVariable String metricType) {
+    public List<Metric> getMetricsByAgentIdAndType(@PathVariable String agentId, @PathVariable String metricType) {
         return metricService.getMetricsByAgentIdAndType(agentId, metricType);
     }
     
     // Add paginated endpoint
     @GetMapping("/agent/{agentId}/type/{metricType}/paginated")
     public Page<Metric> getMetricsByAgentIdAndTypePaginated(
-            @PathVariable Long agentId,
+            @PathVariable String agentId,
             @PathVariable String metricType,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
@@ -65,7 +67,7 @@ public class MetricController {
     // Time range query endpoints
     @GetMapping("/agent/{agentId}/timerange")
     public List<Metric> getMetricsByAgentIdAndTimeRange(
-            @PathVariable Long agentId,
+            @PathVariable String agentId,
             @RequestParam Long startTime,
             @RequestParam Long endTime) {
         return metricService.getMetricsByAgentIdAndTimeRange(agentId, startTime, endTime);
@@ -73,7 +75,7 @@ public class MetricController {
     
     @GetMapping("/agent/{agentId}/timerange/paginated")
     public Page<Metric> getMetricsByAgentIdAndTimeRangePaginated(
-            @PathVariable Long agentId,
+            @PathVariable String agentId,
             @RequestParam Long startTime,
             @RequestParam Long endTime,
             @RequestParam(defaultValue = "0") int page,
@@ -84,7 +86,7 @@ public class MetricController {
     
     @GetMapping("/agent/{agentId}/type/{metricType}/timerange")
     public List<Metric> getMetricsByAgentIdAndTypeAndTimeRange(
-            @PathVariable Long agentId,
+            @PathVariable String agentId,
             @PathVariable String metricType,
             @RequestParam Long startTime,
             @RequestParam Long endTime) {
@@ -93,7 +95,7 @@ public class MetricController {
     
     @GetMapping("/agent/{agentId}/type/{metricType}/timerange/paginated")
     public Page<Metric> getMetricsByAgentIdAndTypeAndTimeRangePaginated(
-            @PathVariable Long agentId,
+            @PathVariable String agentId,
             @PathVariable String metricType,
             @RequestParam Long startTime,
             @RequestParam Long endTime,
@@ -105,17 +107,17 @@ public class MetricController {
     
     @PostMapping
     public Metric saveMetric(@RequestBody Metric metric) {
-        System.out.println("[API] POST /api/metrics - Saving metric for agent: " + metric.getAgentId());
+        log.info("POST /api/metrics - Saving metric for agent: {}", metric.getAgentId());
         Metric result = metricService.saveMetric(metric);
-        System.out.println("[API] POST /api/metrics - Success");
+        log.info("POST /api/metrics - Success");
         return result;
     }
     
     @PostMapping("/batch")
     public List<Metric> saveMetrics(@RequestBody List<Metric> metrics) {
-        System.out.println("[API] POST /api/metrics/batch - Saving " + metrics.size() + " metrics");
+        log.info("POST /api/metrics/batch - Saving {} metrics", metrics.size());
         List<Metric> result = metricService.saveMetrics(metrics);
-        System.out.println("[API] POST /api/metrics/batch - Success");
+        log.info("POST /api/metrics/batch - Success");
         return result;
     }
 }

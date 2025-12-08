@@ -1,5 +1,6 @@
 package com.example.monitoring.metric;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -8,6 +9,7 @@ import javax.script.ScriptEngineManager;
 import java.util.List;
 import java.util.Optional;
 
+@Slf4j
 @Service
 public class MetricDefinitionService {
     
@@ -88,8 +90,7 @@ public class MetricDefinitionService {
      * @return Processed metric value
      */
     public double processMetricValue(String rawOutput, String processingRule) {
-        System.out.println("[METRIC] Processing output: [" + rawOutput + "]");
-        System.out.println("[METRIC] Processing rule: " + processingRule);
+        log.debug("Processing output: [{}], rule: {}", rawOutput, processingRule);
         
         // Check for empty output
         if (rawOutput == null || rawOutput.trim().isEmpty()) {
@@ -100,7 +101,7 @@ public class MetricDefinitionService {
             // If no processing rule, try to parse as double
             try {
                 double value = Double.parseDouble(rawOutput.trim());
-                System.out.println("[METRIC] Parsed value: " + value);
+                log.debug("Parsed value: {}", value);
                 return value;
             } catch (NumberFormatException e) {
                 throw new RuntimeException("Failed to parse metric value: [" + rawOutput + "]", e);
@@ -113,7 +114,7 @@ public class MetricDefinitionService {
             engine.put("value", rawOutput.trim());
             
             Object result = engine.eval(processingRule);
-            System.out.println("[METRIC] Script result: " + result);
+            log.debug("Script result: {}", result);
             
             if (result instanceof Number) {
                 return ((Number) result).doubleValue();
