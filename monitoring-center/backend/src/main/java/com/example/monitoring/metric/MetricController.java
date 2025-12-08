@@ -62,6 +62,47 @@ public class MetricController {
         return metricService.getMetricsByAgentIdAndType(agentId, metricType, pageable);
     }
     
+    // Time range query endpoints
+    @GetMapping("/agent/{agentId}/timerange")
+    public List<Metric> getMetricsByAgentIdAndTimeRange(
+            @PathVariable Long agentId,
+            @RequestParam Long startTime,
+            @RequestParam Long endTime) {
+        return metricService.getMetricsByAgentIdAndTimeRange(agentId, startTime, endTime);
+    }
+    
+    @GetMapping("/agent/{agentId}/timerange/paginated")
+    public Page<Metric> getMetricsByAgentIdAndTimeRangePaginated(
+            @PathVariable Long agentId,
+            @RequestParam Long startTime,
+            @RequestParam Long endTime,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        Pageable pageable = PageRequest.of(page, size);
+        return metricService.getMetricsByAgentIdAndTimeRange(agentId, startTime, endTime, pageable);
+    }
+    
+    @GetMapping("/agent/{agentId}/type/{metricType}/timerange")
+    public List<Metric> getMetricsByAgentIdAndTypeAndTimeRange(
+            @PathVariable Long agentId,
+            @PathVariable String metricType,
+            @RequestParam Long startTime,
+            @RequestParam Long endTime) {
+        return metricService.getMetricsByAgentIdAndTypeAndTimeRange(agentId, metricType, startTime, endTime);
+    }
+    
+    @GetMapping("/agent/{agentId}/type/{metricType}/timerange/paginated")
+    public Page<Metric> getMetricsByAgentIdAndTypeAndTimeRangePaginated(
+            @PathVariable Long agentId,
+            @PathVariable String metricType,
+            @RequestParam Long startTime,
+            @RequestParam Long endTime,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        Pageable pageable = PageRequest.of(page, size);
+        return metricService.getMetricsByAgentIdAndTypeAndTimeRange(agentId, metricType, startTime, endTime, pageable);
+    }
+    
     @PostMapping
     public Metric saveMetric(@RequestBody Metric metric) {
         System.out.println("[API] POST /api/metrics - Saving metric for agent: " + metric.getAgentId());

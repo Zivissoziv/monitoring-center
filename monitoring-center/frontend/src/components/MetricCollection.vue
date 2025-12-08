@@ -9,33 +9,41 @@
       <div class="filter-section">
         <div class="filter-group">
           <label>指标类型:</label>
-          <select v-model="selectedMetricType" @change="filterMetrics" class="filter-select">
-            <option value="ALL">全部指标</option>
-            <option value="CPU">CPU使用率</option>
-            <option value="MEMORY">内存使用率</option>
-          </select>
+          <el-select v-model="selectedMetricType" @change="filterMetrics" placeholder="选择指标类型" style="width: 150px">
+            <el-option label="全部指标" value="ALL" />
+            <el-option label="CPU使用率" value="CPU" />
+            <el-option label="内存使用率" value="MEMORY" />
+          </el-select>
         </div>
         
         <div class="filter-group">
           <label>代理:</label>
-          <select v-model="selectedAgent" @change="filterMetrics" class="filter-select">
-            <option value="ALL">全部代理</option>
-            <option v-for="agentId in uniqueAgentIds" :key="agentId" :value="agentId">
-              代理 {{ agentId }}
-            </option>
-          </select>
+          <el-select v-model="selectedAgent" @change="filterMetrics" placeholder="选择代理" style="width: 150px">
+            <el-option label="全部代理" value="ALL" />
+            <el-option v-for="agentId in uniqueAgentIds" :key="agentId" :label="`代理 ${agentId}`" :value="agentId" />
+          </el-select>
         </div>
         
         <div class="filter-group">
           <label>时间范围:</label>
-          <select v-model="timeRange" @change="filterMetrics" class="filter-select" disabled>
-            <option value="10">最近10条</option>
-            <option value="20">最近20条</option>
-            <option value="50">最近50条</option>
-            <option value="100">最近100条</option>
-            <option value="200">最近200条</option>
-            <option value="500">最近500条</option>
-          </select>
+          <el-date-picker
+            v-model="timeRange"
+            type="datetimerange"
+            range-separator="至"
+            start-placeholder="开始时间"
+            end-placeholder="结束时间"
+            format="YYYY-MM-DD HH:mm:ss"
+            value-format="x"
+            @change="filterMetrics"
+            style="width: 380px"
+          />
+        </div>
+        
+        <div class="filter-group">
+          <el-button type="primary" @click="setQuickRange('1h')" size="small">最近1小时</el-button>
+          <el-button type="primary" @click="setQuickRange('24h')" size="small">最近24小时</el-button>
+          <el-button type="primary" @click="setQuickRange('7d')" size="small">最近7天</el-button>
+          <el-button type="info" @click="clearTimeRange" size="small">清除时间</el-button>
         </div>
       </div>
       
@@ -130,7 +138,7 @@ export default {
       filteredMetrics: [],
       selectedMetricType: 'ALL',
       selectedAgent: 'ALL',
-      timeRange: '100',
+      timeRange: null, // Now stores [startTime, endTime] as timestamps
       viewMode: 'table', // 'table' or 'chart'
       chartInstances: [],
       currentPage: 1,
@@ -234,23 +242,57 @@ export default {
         const page = this.currentPage - 1 // Backend uses 0-based indexing
         const size = this.pageSize
         
-        let url = `/api/metrics/paginated?page=${page}&size=${size}`
+        let url = ''
+        const hasTimeRange = this.timeRange && this.timeRange.length === 2
         
-        // Add filters if applicable
+        // Build URL based on filters
         if (this.selectedAgent !== 'ALL') {
-          url = `/api/metrics/agent/${this.selectedAgent}/paginated?page=${page}&size=${size}`
-        }
-        
-        if (this.selectedMetricType !== 'ALL' && this.selectedAgent !== 'ALL') {
-          url = `/api/metrics/agent/${this.selectedAgent}/type/${this.selectedMetricType}/paginated?page=${page}&size=${size}`
-        } else if (this.selectedMetricType !== 'ALL' && this.selectedAgent === 'ALL') {
-          // For metric type filter without agent, we need to load all and filter on frontend
-          // This is a limitation of our current backend API
-          const response = await fetch('/api/metrics')
-          const allMetrics = await response.json()
-          this.metrics = allMetrics.filter(m => m.metricType === this.selectedMetricType)
-          this.totalMetrics = this.metrics.length
-          return
+          // Agent-specific queries
+          if (this.selectedMetricType !== 'ALL') {
+            // Agent + MetricType + optional TimeRange
+            if (hasTimeRange) {
+              url = `/api/metrics/agent/${this.selectedAgent}/type/${this.selectedMetricType}/timerange/paginated?startTime=${this.timeRange[0]}&endTime=${this.timeRange[1]}&page=${page}&size=${size}`
+            } else {
+              url = `/api/metrics/agent/${this.selectedAgent}/type/${this.selectedMetricType}/paginated?page=${page}&size=${size}`
+            }
+          } else {
+            // Agent only + optional TimeRange
+            if (hasTimeRange) {
+              url = `/api/metrics/agent/${this.selectedAgent}/timerange/paginated?startTime=${this.timeRange[0]}&endTime=${this.timeRange[1]}&page=${page}&size=${size}`
+            } else {
+              url = `/api/metrics/agent/${this.selectedAgent}/paginated?page=${page}&size=${size}`
+            }
+          }
+        } else {
+          // All agents
+          if (this.selectedMetricType !== 'ALL') {
+            // MetricType filter without agent - need to load all and filter on frontend
+            const response = await fetch('/api/metrics')
+            const allMetrics = await response.json()
+            let filtered = allMetrics.filter(m => m.metricType === this.selectedMetricType)
+            
+            // Apply time range filter if set
+            if (hasTimeRange) {
+              filtered = filtered.filter(m => 
+                m.timestamp >= parseInt(this.timeRange[0]) && 
+                m.timestamp <= parseInt(this.timeRange[1])
+              )
+            }
+            
+            this.metrics = filtered
+            this.totalMetrics = filtered.length
+            
+            // Manual pagination for frontend filtering
+            const startIndex = page * size
+            const endIndex = startIndex + size
+            this.filteredMetrics = filtered.slice(startIndex, endIndex)
+            this.filteredMetrics.sort((a, b) => b.timestamp - a.timestamp)
+            return
+          } else {
+            // All metrics - time range not supported for global query without agent
+            // Just use pagination
+            url = `/api/metrics/paginated?page=${page}&size=${size}`
+          }
         }
         
         const response = await fetch(url)
@@ -270,6 +312,7 @@ export default {
         this.filteredMetrics.sort((a, b) => b.timestamp - a.timestamp)
       } catch (error) {
         console.error('Error loading paginated data:', error)
+        this.$message.error('加载数据失败')
       }
     },
     
@@ -283,6 +326,33 @@ export default {
     handlePageChange(newPage) {
       this.currentPage = newPage
       this.loadPaginatedData()
+    },
+    
+    setQuickRange(range) {
+      const now = Date.now()
+      let startTime
+      
+      switch(range) {
+        case '1h':
+          startTime = now - (60 * 60 * 1000) // 1 hour ago
+          break
+        case '24h':
+          startTime = now - (24 * 60 * 60 * 1000) // 24 hours ago
+          break
+        case '7d':
+          startTime = now - (7 * 24 * 60 * 60 * 1000) // 7 days ago
+          break
+        default:
+          return
+      }
+      
+      this.timeRange = [startTime, now]
+      this.filterMetrics()
+    },
+    
+    clearTimeRange() {
+      this.timeRange = null
+      this.filterMetrics()
     },
     
     renderIndividualCharts() {
@@ -447,7 +517,7 @@ export default {
 
 .filter-section {
   display: flex;
-  gap: 20px;
+  gap: 15px;
   flex-wrap: wrap;
   align-items: center;
 }
@@ -455,7 +525,7 @@ export default {
 .filter-group {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
 }
 
 .filter-group label {
@@ -463,30 +533,6 @@ export default {
   color: #1976d2;
   font-size: 14px;
   white-space: nowrap;
-}
-
-.filter-select {
-  padding: 8px 15px;
-  border: 2px solid #1976d2;
-  border-radius: 6px;
-  background: #ffffff;
-  color: #1976d2;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  min-width: 120px;
-}
-
-.filter-select:hover {
-  border-color: #0d47a1;
-  background: #e3f2fd;
-}
-
-.filter-select:focus {
-  outline: none;
-  border-color: #0d47a1;
-  box-shadow: 0 0 0 3px rgba(25, 118, 210, 0.1);
 }
 
 .view-toggle {

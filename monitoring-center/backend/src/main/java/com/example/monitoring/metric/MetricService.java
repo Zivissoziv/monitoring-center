@@ -49,6 +49,23 @@ public class MetricService {
         return metricRepository.findByAgentIdAndMetricTypeOrderByTimestampDesc(agentId, metricType, pageable);
     }
     
+    // Add time range query methods
+    public List<Metric> getMetricsByAgentIdAndTimeRange(Long agentId, Long startTime, Long endTime) {
+        return metricRepository.findByAgentIdAndTimestampBetweenOrderByTimestampDesc(agentId, startTime, endTime);
+    }
+    
+    public List<Metric> getMetricsByAgentIdAndTypeAndTimeRange(Long agentId, String metricType, Long startTime, Long endTime) {
+        return metricRepository.findByAgentIdAndMetricTypeAndTimestampBetweenOrderByTimestampDesc(agentId, metricType, startTime, endTime);
+    }
+    
+    public Page<Metric> getMetricsByAgentIdAndTimeRange(Long agentId, Long startTime, Long endTime, Pageable pageable) {
+        return metricRepository.findByAgentIdAndTimestampBetweenOrderByTimestampDesc(agentId, startTime, endTime, pageable);
+    }
+    
+    public Page<Metric> getMetricsByAgentIdAndTypeAndTimeRange(Long agentId, String metricType, Long startTime, Long endTime, Pageable pageable) {
+        return metricRepository.findByAgentIdAndMetricTypeAndTimestampBetweenOrderByTimestampDesc(agentId, metricType, startTime, endTime, pageable);
+    }
+    
     public Metric saveMetric(Metric metric) {
         // Check if agent exists
         Agent agent = agentRepository.findById(metric.getAgentId())
