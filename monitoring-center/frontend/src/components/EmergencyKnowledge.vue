@@ -120,6 +120,22 @@
             
             <el-row :gutter="20">
               <el-col :span="12">
+                <el-form-item label="执行代理">
+                  <el-select v-model="step.agentId" placeholder="使用告警代理" clearable style="width: 100%">
+                    <el-option label="使用告警代理" :value="null" />
+                    <el-option 
+                      v-for="agent in agents" 
+                      :key="agent.id" 
+                      :label="`${agent.name} (${agent.ip})`" 
+                      :value="agent.id"
+                    />
+                  </el-select>
+                  <div style="font-size: 12px; color: #909399; margin-top: 4px;">
+                    不选择则在告警对应的代理上执行
+                  </div>
+                </el-form-item>
+              </el-col>
+              <el-col :span="12">
                 <el-form-item label="依赖步骤">
                   <el-select v-model="step.dependsOnIndex" placeholder="无依赖" style="width: 100%">
                     <el-option label="无依赖" :value="null" />
@@ -127,12 +143,11 @@
                   </el-select>
                 </el-form-item>
               </el-col>
-              <el-col :span="12">
-                <el-form-item label="备注">
-                  <el-input v-model="step.notes" placeholder="额外说明或警告" />
-                </el-form-item>
-              </el-col>
             </el-row>
+            
+            <el-form-item label="备注">
+              <el-input v-model="step.notes" placeholder="额外说明或警告" />
+            </el-form-item>
           </el-card>
         </div>
       </el-form>
@@ -185,6 +200,9 @@
                 <div class="command-label">执行命令：</div>
                 <pre class="command-text">{{ step.linuxCommand }}</pre>
               </div>
+              <el-alert v-if="step.agentId" type="success" :closable="false" style="margin-top: 10px;">
+                执行代理: {{ getAgentName(step.agentId) }}
+              </el-alert>
               <el-alert v-if="step.dependsOn" type="warning" :closable="false" style="margin-top: 10px;">
                 依赖步骤: 步骤 {{ findStepNumber(viewingKnowledge.steps, step.dependsOn) }}
               </el-alert>
@@ -223,6 +241,7 @@ export default {
     return {
       knowledgeList: [],
       alertRules: [],
+      agents: [],
       loading: false,
       showDialog: false,
       showViewDialog: false,
@@ -260,6 +279,10 @@ export default {
         // Load alert rules
         const rulesResponse = await fetch('/api/alerts/rules')
         this.alertRules = await rulesResponse.json()
+        
+        // Load agents
+        const agentsResponse = await fetch('/api/agents')
+        this.agents = await agentsResponse.json()
       } catch (error) {
         console.error('Error loading data:', error)
         ElMessage.error('加载数据失败')
@@ -271,6 +294,12 @@ export default {
     getAlertRuleName(alertRuleId) {
       const rule = this.alertRules.find(r => r.id === alertRuleId)
       return rule ? rule.name : '未知规则'
+    },
+    
+    getAgentName(agentId) {
+      if (!agentId) return '告警代理'
+      const agent = this.agents.find(a => a.id === agentId)
+      return agent ? `${agent.name} (${agent.ip})` : '未知代理'
     },
     
     formatTime(timestamp) {
@@ -294,6 +323,7 @@ export default {
         steps: knowledge.steps.map((step, index) => ({
           description: step.description,
           linuxCommand: step.linuxCommand,
+          agentId: step.agentId || null,
           dependsOnIndex: step.dependsOn ? this.findStepIndex(knowledge.steps, step.dependsOn) : null,
           notes: step.notes || ''
         }))
@@ -320,6 +350,7 @@ export default {
       this.currentKnowledge.steps.push({
         description: '',
         linuxCommand: '',
+        agentId: null,
         dependsOnIndex: null,
         notes: ''
       })

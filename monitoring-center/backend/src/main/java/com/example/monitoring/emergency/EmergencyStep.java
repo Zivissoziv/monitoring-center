@@ -20,6 +20,9 @@ public class EmergencyStep {
     @Column(name = "linux_command", length = 2000)
     private String linuxCommand; // Linux command to execute
     
+    @Column(name = "agent_id")
+    private Long agentId; // ID of the agent to execute on (null = use alert's agent)
+    
     @Column(name = "depends_on")
     private Long dependsOn; // ID of the step this depends on (null if no dependency)
     
@@ -74,6 +77,14 @@ public class EmergencyStep {
     
     public void setLinuxCommand(String linuxCommand) {
         this.linuxCommand = linuxCommand;
+    }
+    
+    public Long getAgentId() {
+        return agentId;
+    }
+    
+    public void setAgentId(Long agentId) {
+        this.agentId = agentId;
     }
     
     public Long getDependsOn() {

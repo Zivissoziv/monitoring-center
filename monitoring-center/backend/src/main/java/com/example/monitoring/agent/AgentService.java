@@ -3,6 +3,10 @@ package com.example.monitoring.agent;
 import com.example.monitoring.alert.AlertService;
 import com.example.monitoring.metric.Metric;
 import com.example.monitoring.metric.MetricRepository;
+import com.example.monitoring.metric.MetricDefinition;
+import com.example.monitoring.metric.MetricDefinitionService;
+import com.example.monitoring.metric.AgentMetricConfig;
+import com.example.monitoring.metric.AgentMetricConfigService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -26,6 +30,12 @@ public class AgentService {
     @Autowired
     private AlertService alertService;
     
+    @Autowired
+    private MetricDefinitionService metricDefinitionService;
+    
+    @Autowired
+    private AgentMetricConfigService agentMetricConfigService;
+    
     private final RestTemplate restTemplate = new RestTemplate();
     
     public List<Agent> getAllAgents() {
@@ -40,6 +50,9 @@ public class AgentService {
         // Set initial status
         agent.setStatus("INACTIVE");
         Agent savedAgent = agentRepository.save(agent);
+        
+        // Initialize default metric configs for this agent
+        agentMetricConfigService.initializeDefaultConfigsForAgent(savedAgent.getId());
         
         // Try to connect to agent to verify it's reachable
         checkAgentHealth(savedAgent);
@@ -86,50 +99,82 @@ public class AgentService {
     }
     
     /**
-     * Collect metrics from agent
+     * Collect metrics from agent using custom metric definitions
      */
     public void collectMetricsFromAgent(Long agentId) {
         Agent agent = agentRepository.findById(agentId)
                 .orElseThrow(() -> new RuntimeException("Agent not found with id: " + agentId));
         
-        try {
-            String url = "http://" + agent.getIp() + ":" + agent.getPort() + "/metrics";
-            ResponseEntity<Map> response = restTemplate.getForEntity(url, Map.class);
-            
-            if (response.getStatusCode() == HttpStatus.OK && response.getBody() != null) {
-                Map<String, Object> metricsData = response.getBody();
+        // Get enabled metric configs for this agent
+        List<AgentMetricConfig> configs = agentMetricConfigService.getEnabledConfigsByAgent(agentId);
+        
+        for (AgentMetricConfig config : configs) {
+            try {
+                // Get metric definition
+                MetricDefinition definition = metricDefinitionService.getDefinitionByName(config.getMetricName())
+                        .orElse(null);
                 
-                // Save CPU metric
-                if (metricsData.containsKey("cpu")) {
-                    Metric cpuMetric = new Metric();
-                    cpuMetric.setAgentId(agentId);
-                    cpuMetric.setMetricType("CPU");
-                    cpuMetric.setValue(((Number) metricsData.get("cpu")).doubleValue());
-                    cpuMetric.setTimestamp(System.currentTimeMillis());
-                    Metric savedCpuMetric = metricRepository.save(cpuMetric);
-                    // Check if any alerts should be triggered
-                    alertService.checkAlert(savedCpuMetric);
+                if (definition == null || !definition.isEnabled()) {
+                    continue;
                 }
                 
-                // Save Memory metric
-                if (metricsData.containsKey("memory")) {
-                    Metric memoryMetric = new Metric();
-                    memoryMetric.setAgentId(agentId);
-                    memoryMetric.setMetricType("MEMORY");
-                    memoryMetric.setValue(((Number) metricsData.get("memory")).doubleValue());
-                    memoryMetric.setTimestamp(System.currentTimeMillis());
-                    Metric savedMemoryMetric = metricRepository.save(memoryMetric);
-                    // Check if any alerts should be triggered
-                    alertService.checkAlert(savedMemoryMetric);
+                // Check if it's time to collect (based on interval)
+                long now = System.currentTimeMillis();
+                int interval = agentMetricConfigService.getEffectiveInterval(agentId, config.getMetricName());
+                
+                if (config.getLastCollectionTime() != null) {
+                    long timeSinceLastCollection = (now - config.getLastCollectionTime()) / 1000;
+                    if (timeSinceLastCollection < interval) {
+                        continue; // Skip, not time yet
+                    }
                 }
+                
+                // Execute collection command on agent
+                Map<String, Object> result = executeCommandOnAgent(agentId, definition.getCollectionCommand());
+                
+                // Check for errors
+                if (result.containsKey("error") && result.get("error") != null && !result.get("error").toString().isEmpty()) {
+                    System.err.println("Failed to collect metric " + config.getMetricName() + 
+                                     " from agent " + agentId + ": " + result.get("error"));
+                    continue;
+                }
+                
+                // Check exit code
+                if (result.containsKey("exitCode") && !Integer.valueOf(0).equals(result.get("exitCode"))) {
+                    System.err.println("Failed to collect metric " + config.getMetricName() + 
+                                     " from agent " + agentId + ": Command exited with code " + result.get("exitCode") +
+                                     ", stderr: " + result.get("error"));
+                    continue;
+                }
+                
+                // Extract output from result
+                String output = result.containsKey("output") ? result.get("output").toString() : "";
+                
+                // Process the output using the processing rule
+                double value = metricDefinitionService.processMetricValue(output, definition.getProcessingRule());
+                
+                // Save metric
+                Metric metric = new Metric();
+                metric.setAgentId(agentId);
+                metric.setMetricType(config.getMetricName());
+                metric.setValue(value);
+                metric.setTimestamp(now);
+                Metric savedMetric = metricRepository.save(metric);
+                
+                // Check alerts
+                alertService.checkAlert(savedMetric);
+                
+                // Update last collection time
+                agentMetricConfigService.updateLastCollectionTime(agentId, config.getMetricName());
                 
                 // Update agent status to ACTIVE
                 agent.setStatus("ACTIVE");
                 agentRepository.save(agent);
+                
+            } catch (Exception e) {
+                System.err.println("Error collecting metric " + config.getMetricName() + 
+                                 " from agent " + agentId + ": " + e.getMessage());
             }
-        } catch (Exception e) {
-            agent.setStatus("DISCONNECTED");
-            agentRepository.save(agent);
         }
     }
     

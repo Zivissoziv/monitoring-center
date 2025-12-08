@@ -1,6 +1,13 @@
 <template>
   <div class="agent-management">
     
+    <el-alert type="success" :closable="false" style="margin-bottom: 20px;">
+      <template #title>
+        <strong>提示</strong>
+      </template>
+      新增代理后，系统会自动为其分配所有启用的指标。如需自定义配置，请前往<strong>「指标定义」</strong>页面，展开对应指标进行调整。
+    </el-alert>
+    
     <el-card class="agent-form" shadow="hover">
       <template #header>
         <div class="card-header">

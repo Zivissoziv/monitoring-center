@@ -163,7 +163,7 @@
                       <el-button 
                         size="small"
                         type="primary"
-                        @click="executeStepCommand(step.linuxCommand)" 
+                        @click="executeStepCommand(step, index)" 
                         :loading="isExecutingCommand && executingCommand === step.linuxCommand"
                         :disabled="isExecutingCommand"
                       >
@@ -178,6 +178,9 @@
                     </div>
                   </div>
                   
+                  <el-alert v-if="step.agentId" type="success" :closable="false" style="margin-top: 10px;">
+                    执行代理: {{ getAgentName(step.agentId) }}
+                  </el-alert>
                   <el-alert v-if="step.dependsOn" type="warning" :closable="false" style="margin-top: 10px;">
                     依赖步骤: 步骤 {{ findStepNumber(step.dependsOn) }}
                   </el-alert>
@@ -800,6 +803,11 @@ export default {
       return agent ? agent.ip : 'Unknown'
     }
     
+    const getAgentName = (agentId) => {
+      const agent = agents.value.find(a => a.id === agentId)
+      return agent ? `${agent.name} (${agent.ip})` : '未知代理'
+    }
+    
     const getMetricTypeName = (type) => {
       const typeMap = {
         'CPU': 'CPU使用率',
@@ -949,28 +957,29 @@ export default {
       return index >= 0 ? index + 1 : 0
     }
     
-    const executeStepCommand = async (command) => {
-      if (!selectedAlert.value || !command.trim()) return
+    const executeStepCommand = async (step, stepIndex) => {
+      if (!selectedAlert.value || !step.linuxCommand.trim()) return
       
-      executingCommand.value = command
+      // Determine which agent to execute on
+      const targetAgentId = step.agentId || selectedAlert.value.agentId
+      
+      executingCommand.value = step.linuxCommand
       isExecutingCommand.value = true
       
-      // Find the step index
-      const stepIndex = emergencyKnowledge.value.steps.findIndex(s => s.linuxCommand === command)
-      
       try {
-        const response = await fetch(`/api/agents/${selectedAlert.value.agentId}/execute`, {
+        const response = await fetch(`/api/agents/${targetAgentId}/execute`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
           },
-          body: JSON.stringify({ command: command })
+          body: JSON.stringify({ command: step.linuxCommand })
         })
         
         if (response.ok) {
           const result = await response.json()
           stepResults.value[stepIndex] = result
           stepResultTab.value[stepIndex] = 'output' // Default to output tab
+          ElMessage.success('命令执行成功')
         } else {
           stepResults.value[stepIndex] = {
             error: `HTTP ${response.status}: ${response.statusText}`,
@@ -978,6 +987,7 @@ export default {
             exitCode: -1
           }
           stepResultTab.value[stepIndex] = 'error'
+          ElMessage.error('命令执行失败')
         }
       } catch (error) {
         stepResults.value[stepIndex] = {
@@ -986,6 +996,7 @@ export default {
           exitCode: -1
         }
         stepResultTab.value[stepIndex] = 'error'
+        ElMessage.error(`网络错误: ${error.message}`)
       } finally {
         isExecutingCommand.value = false
         executingCommand.value = ''
@@ -1051,6 +1062,7 @@ export default {
       loading,
       getMetricTypeName,
       getSeverityText,
+      getAgentName,
       formatValue,
       formatTime,
       formatTimeShort,

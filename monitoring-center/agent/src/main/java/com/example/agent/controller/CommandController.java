@@ -24,10 +24,28 @@ public class CommandController {
         }
         
         System.out.println("[COMMAND] Executing: " + command);
+        System.out.println("[COMMAND] OS: " + System.getProperty("os.name"));
         
         try {
+            // Detect OS and use appropriate shell
+            String os = System.getProperty("os.name").toLowerCase();
+            ProcessBuilder processBuilder;
+            
+            if (os.contains("win")) {
+                // Windows: use cmd.exe /c
+                processBuilder = new ProcessBuilder("cmd.exe", "/c", command);
+                System.out.println("[COMMAND] Using Windows shell");
+            } else {
+                // Linux/Unix: use /bin/bash -c (bash is more feature-rich than sh)
+                processBuilder = new ProcessBuilder("/bin/bash", "-c", command);
+                System.out.println("[COMMAND] Using bash shell");
+            }
+            
+            // Redirect error stream if needed for debugging
+            processBuilder.redirectErrorStream(false);
+            
             // Execute the command
-            Process process = Runtime.getRuntime().exec(command);
+            Process process = processBuilder.start();
             
             // Read output
             StringBuilder output = new StringBuilder();
@@ -51,15 +69,27 @@ public class CommandController {
             // Wait for process completion
             int exitCode = process.waitFor();
             
+            // Trim outputs
+            String finalOutput = output.toString().trim();
+            String finalError = errorOutput.toString().trim();
+            
             // Prepare response
             Map<String, Object> response = new HashMap<>();
             response.put("command", command);
             response.put("exitCode", exitCode);
-            response.put("output", output.toString());
-            response.put("error", errorOutput.toString());
+            response.put("output", finalOutput);
+            response.put("error", finalError);
             response.put("timestamp", System.currentTimeMillis());
             
-            System.out.println("[COMMAND] Completed with exit code: " + exitCode);
+            if (exitCode == 0) {
+                System.out.println("[COMMAND] Completed successfully");
+                System.out.println("[COMMAND] Output: [" + finalOutput + "]");
+                System.out.println("[COMMAND] Output length: " + finalOutput.length());
+            } else {
+                System.err.println("[COMMAND] Failed with exit code: " + exitCode);
+                System.err.println("[COMMAND] Stdout: [" + finalOutput + "]");
+                System.err.println("[COMMAND] Stderr: [" + finalError + "]");
+            }
             return response;
         } catch (Exception e) {
             System.err.println("[COMMAND] Error executing command: " + e.getMessage());

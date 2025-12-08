@@ -23,6 +23,10 @@
             <el-icon><TrendCharts /></el-icon>
             <span>监控指标</span>
           </el-menu-item>
+          <el-menu-item index="metric-definitions">
+            <el-icon><Setting /></el-icon>
+            <span>指标定义</span>
+          </el-menu-item>
           <el-menu-item index="alerts">
             <el-icon><Bell /></el-icon>
             <span>告警管理</span>
@@ -39,6 +43,7 @@
       <MonitoringDashboard v-if="activeTab === 'dashboard'" />
       <AgentManagement v-if="activeTab === 'agents'" />
       <MetricCollection v-if="activeTab === 'metrics'" />
+      <MetricDefinitions v-if="activeTab === 'metric-definitions'" />
       <AlertManagement v-if="activeTab === 'alerts'" />
       <EmergencyKnowledge v-if="activeTab === 'emergency'" />
     </el-main>
@@ -46,9 +51,10 @@
 </template>
 
 <script>
-import { Monitor, DataBoard, TrendCharts, Bell, Reading } from '@element-plus/icons-vue'
+import { Monitor, DataBoard, TrendCharts, Bell, Reading, Setting } from '@element-plus/icons-vue'
 import AgentManagement from './components/AgentManagement.vue'
 import MetricCollection from './components/MetricCollection.vue'
+import MetricDefinitions from './components/MetricDefinitions.vue'
 import AlertManagement from './components/AlertManagement.vue'
 import MonitoringDashboard from './components/MonitoringDashboard.vue'
 import EmergencyKnowledge from './components/EmergencyKnowledge.vue'
@@ -61,9 +67,11 @@ export default {
     TrendCharts,
     Bell,
     Reading,
+    Setting,
     MonitoringDashboard,
     AgentManagement,
     MetricCollection,
+    MetricDefinitions,
     AlertManagement,
     EmergencyKnowledge
   },

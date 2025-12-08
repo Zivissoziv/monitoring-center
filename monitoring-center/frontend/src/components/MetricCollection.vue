@@ -8,8 +8,7 @@
         <el-form-item label="指标类型">
           <el-select v-model="selectedMetricType" @change="filterMetrics" placeholder="选择指标类型" style="width: 150px">
             <el-option label="全部指标" value="ALL" />
-            <el-option label="CPU使用率" value="CPU" />
-            <el-option label="内存使用率" value="MEMORY" />
+            <el-option v-for="definition in metricDefinitions" :key="definition.metricName" :label="definition.displayName" :value="definition.metricName" />
           </el-select>
         </el-form-item>
         
@@ -142,6 +141,7 @@ export default {
     return {
       metrics: [],
       filteredMetrics: [],
+      metricDefinitions: [],
       loading: false,
       selectedMetricType: 'ALL',
       selectedAgent: 'ALL',
@@ -222,6 +222,7 @@ export default {
     }
   },
   mounted() {
+    this.loadMetricDefinitions()
     this.loadAllData()
     // Removed auto-refresh
   },
@@ -234,6 +235,15 @@ export default {
     })
   },
   methods: {
+    async loadMetricDefinitions() {
+      try {
+        const response = await fetch('/api/metric-definitions/enabled')
+        this.metricDefinitions = await response.json()
+      } catch (error) {
+        console.error('Error loading metric definitions:', error)
+      }
+    },
+    
     async loadAllData() {
       try {
         // Load paginated metrics
@@ -489,18 +499,14 @@ export default {
     },
     
     getMetricTypeName(type) {
-      const typeMap = {
-        'CPU': 'CPU使用率',
-        'MEMORY': '内存使用率'
-      }
-      return typeMap[type] || type
+      const definition = this.metricDefinitions.find(d => d.metricName === type)
+      return definition ? definition.displayName : type
     },
     
     formatValue(value, type) {
-      if (type === 'CPU' || type === 'MEMORY') {
-        return value.toFixed(2) + '%'
-      }
-      return value.toFixed(2)
+      const definition = this.metricDefinitions.find(d => d.metricName === type)
+      const unit = definition ? definition.unit : ''
+      return value.toFixed(2) + (unit ? ' ' + unit : '')
     },
     
     formatTime(timestamp) {
