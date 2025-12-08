@@ -1,95 +1,123 @@
 <template>
   <div class="alert-management">
-    <div class="section-header">
-      <h2><span class="icon">🔔</span> 告警管理</h2>
-    </div>
-    
-    <div class="alert-form card">
-      <h3>创建告警规则</h3>
-      <form @submit.prevent="addAlertRule">
-        <div class="form-row">
-          <div class="form-group">
-            <label>规则名称：</label>
-            <input v-model="newAlertRule.name" required placeholder="输入规则名称" />
-          </div>
-          <div class="form-group">
-            <label>指标类型：</label>
-            <select v-model="newAlertRule.metricType" required>
-              <option value="CPU">CPU使用率</option>
-              <option value="MEMORY">内存使用率</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label>条件：</label>
-            <select v-model="newAlertRule.condition" required>
-              <option value="GT">大于</option>
-              <option value="LT">小于</option>
-              <option value="EQ">等于</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label>阈值：</label>
-            <input v-model.number="newAlertRule.threshold" type="number" step="0.01" required placeholder="80.0" />
-          </div>
-          <div class="form-group">
-            <label>严重程度：</label>
-            <select v-model="newAlertRule.severity" required>
-              <option value="LOW">低</option>
-              <option value="MEDIUM">中</option>
-              <option value="HIGH">高</option>
-              <option value="CRITICAL">严重</option>
-            </select>
-          </div>
-          <button type="submit" class="btn-primary">创建规则</button>
+   
+    <el-card class="alert-form" shadow="hover">
+      <template #header>
+        <div class="card-header">
+          <span>创建告警规则</span>
         </div>
-      </form>
-    </div>
+      </template>
+      <el-form :model="newAlertRule" label-width="100px" :inline="true" @submit.prevent="addAlertRule">
+        <el-form-item label="规则名称">
+          <el-input v-model="newAlertRule.name" placeholder="输入规则名称" required style="width: 200px" />
+        </el-form-item>
+        <el-form-item label="指标类型">
+          <el-select v-model="newAlertRule.metricType" placeholder="选择指标" style="width: 150px">
+            <el-option label="CPU使用率" value="CPU" />
+            <el-option label="内存使用率" value="MEMORY" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="条件">
+          <el-select v-model="newAlertRule.condition" style="width: 120px">
+            <el-option label="大于" value="GT" />
+            <el-option label="小于" value="LT" />
+            <el-option label="等于" value="EQ" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="阈值">
+          <el-input-number v-model="newAlertRule.threshold" :min="0" :max="100" :step="0.01" style="width: 150px" />
+        </el-form-item>
+        <el-form-item label="严重程度">
+          <el-select v-model="newAlertRule.severity" style="width: 120px">
+            <el-option label="低" value="LOW" />
+            <el-option label="中" value="MEDIUM" />
+            <el-option label="高" value="HIGH" />
+            <el-option label="严重" value="CRITICAL" />
+          </el-select>
+        </el-form-item>
+        <el-form-item>
+          <el-button type="primary" @click="addAlertRule" :icon="Plus">创建规则</el-button>
+        </el-form-item>
+      </el-form>
+    </el-card>
     
-    <div class="alert-list card">
-      <h3>告警规则列表</h3>
-      <div class="table-container">
-        <table>
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>规则名称</th>
-              <th>指标类型</th>
-              <th>条件</th>
-              <th>阈值</th>
-              <th>严重程度</th>
-              <th>状态</th>
-              <th>操作</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="rule in alertRules" :key="rule.id">
-              <td>{{ rule.id }}</td>
-              <td>{{ rule.name }}</td>
-              <td><span :class="'metric-type metric-' + rule.metricType.toLowerCase()">{{ getMetricTypeName(rule.metricType) }}</span></td>
-              <td>{{ getConditionText(rule.condition) }}</td>
-              <td><span class="threshold-value">{{ rule.threshold }}</span></td>
-              <td><span :class="'severity severity-' + rule.severity.toLowerCase()">{{ getSeverityText(rule.severity) }}</span></td>
-              <td><span :class="rule.enabled ? 'status-enabled' : 'status-disabled'">{{ rule.enabled ? '启用' : '禁用' }}</span></td>
-              <td>
-                <button @click="deleteAlertRule(rule.id)" class="btn-danger">删除</button>
-              </td>
-            </tr>
-            <tr v-if="alertRules.length === 0">
-              <td colspan="8" class="no-data">暂无告警规则</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
+    <el-card class="alert-list" shadow="hover">
+      <template #header>
+        <div class="card-header">
+          <span>告警规则列表</span>
+        </div>
+      </template>
+      <el-table :data="alertRules" stripe style="width: 100%" v-loading="loading">
+        <el-table-column prop="id" label="ID" width="80" />
+        <el-table-column prop="name" label="规则名称" min-width="150" />
+        <el-table-column label="指标类型" width="120">
+          <template #default="scope">
+            <el-tag :type="scope.row.metricType === 'CPU' ? 'danger' : 'primary'" size="small">
+              {{ getMetricTypeName(scope.row.metricType) }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="条件" width="100">
+          <template #default="scope">
+            {{ getConditionText(scope.row.condition) }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="threshold" label="阈值" width="100">
+          <template #default="scope">
+            <span class="threshold-value">{{ scope.row.threshold }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="严重程度" width="120">
+          <template #default="scope">
+            <el-tag :type="getSeverityType(scope.row.severity)" size="small">
+              {{ getSeverityText(scope.row.severity) }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="状态" width="100">
+          <template #default="scope">
+            <el-tag :type="scope.row.enabled ? 'success' : 'info'" size="small">
+              {{ scope.row.enabled ? '启用' : '禁用' }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="150">
+          <template #default="scope">
+            <el-popconfirm 
+              title="确定要删除该告警规则吗？" 
+              @confirm="deleteAlertRule(scope.row.id)"
+              confirm-button-text="确定"
+              cancel-button-text="取消"
+            >
+              <template #reference>
+                <el-button size="small" type="danger" :icon="Delete">删除</el-button>
+              </template>
+            </el-popconfirm>
+          </template>
+        </el-table-column>
+        <template #empty>
+          <el-empty description="暂无告警规则" />
+        </template>
+      </el-table>
+    </el-card>
   </div>
 </template>
 
 <script>
+import { Bell, Plus, Delete } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
+
 export default {
   name: 'AlertManagement',
+  components: {
+    Bell,
+    Plus,
+    Delete
+  },
   data() {
     return {
       alertRules: [],
+      loading: false,
       newAlertRule: {
         name: '',
         metricType: 'CPU',
@@ -105,15 +133,24 @@ export default {
   },
   methods: {
     async loadAlertRules() {
+      this.loading = true
       try {
         const response = await fetch('/api/alerts/rules')
         this.alertRules = await response.json()
       } catch (error) {
         console.error('Error loading alert rules:', error)
+        ElMessage.error('加载告警规则失败')
+      } finally {
+        this.loading = false
       }
     },
     
     async addAlertRule() {
+      if (!this.newAlertRule.name) {
+        ElMessage.warning('请输入规则名称')
+        return
+      }
+      
       try {
         const response = await fetch('/api/alerts/rules', {
           method: 'POST',
@@ -134,15 +171,17 @@ export default {
             severity: 'HIGH',
             enabled: true
           }
+          ElMessage.success('规则创建成功')
+        } else {
+          ElMessage.error('规则创建失败')
         }
       } catch (error) {
         console.error('Error adding alert rule:', error)
+        ElMessage.error('规则创建失败')
       }
     },
     
     async deleteAlertRule(id) {
-      if (!confirm('确定要删除该告警规则吗？')) return
-      
       try {
         const response = await fetch(`/api/alerts/rules/${id}`, {
           method: 'DELETE'
@@ -150,9 +189,13 @@ export default {
         
         if (response.ok) {
           this.alertRules = this.alertRules.filter(rule => rule.id !== id)
+          ElMessage.success('规则删除成功')
+        } else {
+          ElMessage.error('规则删除失败')
         }
       } catch (error) {
         console.error('Error deleting alert rule:', error)
+        ElMessage.error('规则删除失败')
       }
     },
     
@@ -181,239 +224,54 @@ export default {
         'CRITICAL': '严重'
       }
       return severityMap[severity] || severity
+    },
+    
+    getSeverityType(severity) {
+      const typeMap = {
+        'LOW': 'success',
+        'MEDIUM': 'warning',
+        'HIGH': 'warning',
+        'CRITICAL': 'danger'
+      }
+      return typeMap[severity] || 'info'
     }
   }
 }
 </script>
 
 <style scoped>
-.section-header h2 {
-  color: #1976d2;
-  font-size: 24px;
-  margin-bottom: 25px;
+.page-title {
   display: flex;
   align-items: center;
   gap: 10px;
+  font-size: 20px;
   font-weight: 600;
-}
-
-.section-header .icon {
-  font-size: 28px;
-}
-
-.card {
-  background: rgba(255, 255, 255, 0.95);
-  border: 2px solid #e3f2fd;
-  border-radius: 12px;
-  padding: 25px;
-  margin-bottom: 25px;
-  box-shadow: 0 4px 20px rgba(25, 118, 210, 0.1);
-}
-
-.card h3 {
   color: #1976d2;
-  font-size: 18px;
+}
+
+.alert-management {
+  padding: 20px;
+}
+
+.el-page-header {
+  margin-bottom: 24px;
+}
+
+.alert-form,
+.alert-list {
   margin-bottom: 20px;
-  border-bottom: 2px solid #e3f2fd;
-  padding-bottom: 10px;
-  font-weight: 600;
 }
 
-.form-row {
+.card-header {
   display: flex;
-  gap: 15px;
-  align-items: flex-end;
-  flex-wrap: wrap;
-}
-
-.form-group {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.form-group label {
-  color: #1976d2;
-  font-size: 14px;
+  align-items: center;
+  justify-content: space-between;
   font-weight: 600;
-}
-
-.form-group input,
-.form-group select {
-  padding: 10px 15px;
-  background: #ffffff;
-  border: 2px solid #e3f2fd;
-  border-radius: 6px;
-  color: #1976d2;
-  font-size: 14px;
-  min-width: 180px;
-  transition: all 0.3s ease;
-}
-
-.form-group input:focus,
-.form-group select:focus {
-  outline: none;
-  border-color: #1976d2;
-  box-shadow: 0 0 10px rgba(25, 118, 210, 0.2);
-}
-
-.form-group input::placeholder {
-  color: #90caf9;
-}
-
-.btn-primary {
-  padding: 10px 24px;
-  background: #1976d2;
-  border: none;
-  border-radius: 6px;
-  color: #ffffff;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.btn-primary:hover {
-  background: #1565c0;
-  transform: translateY(-2px);
-  box-shadow: 0 5px 20px rgba(25, 118, 210, 0.3);
-}
-
-.table-container {
-  overflow-x: auto;
-}
-
-table {
-  width: 100%;
-  border-collapse: separate;
-  border-spacing: 0;
-}
-
-thead {
-  background: #e3f2fd;
-}
-
-th {
-  padding: 15px;
-  text-align: left;
-  color: #1976d2;
-  font-weight: 600;
-  font-size: 14px;
-  border-bottom: 2px solid #bbdefb;
-}
-
-td {
-  padding: 15px;
-  color: #000000;
-  border-bottom: 1px solid #e3f2fd;
-}
-
-tbody tr {
-  transition: all 0.3s ease;
-}
-
-tbody tr:hover {
-  background: #f5f5f5;
-}
-
-.metric-type {
-  padding: 4px 12px;
-  border-radius: 12px;
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.metric-cpu {
-  background: #ffebee;
-  color: #c62828;
-  border: 1px solid #ef5350;
-}
-
-.metric-memory {
-  background: #e3f2fd;
-  color: #1976d2;
-  border: 1px solid #64b5f6;
+  font-size: 16px;
 }
 
 .threshold-value {
   font-weight: 600;
   color: #1976d2;
-  font-size: 15px;
-}
-
-.severity {
-  padding: 4px 12px;
-  border-radius: 12px;
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.severity-low {
-  background: #e8f5e9;
-  color: #2e7d32;
-  border: 1px solid #66bb6a;
-}
-
-.severity-medium {
-  background: #fff3e0;
-  color: #ef6c00;
-  border: 1px solid #ffa726;
-}
-
-.severity-high {
-  background: #fff3e0;
-  color: #f57c00;
-  border: 1px solid #ff9800;
-}
-
-.severity-critical {
-  background: #ffebee;
-  color: #c62828;
-  border: 1px solid #ef5350;
-}
-
-.status-enabled {
-  padding: 4px 12px;
-  border-radius: 12px;
-  font-size: 12px;
-  font-weight: 600;
-  background: #e8f5e9;
-  color: #2e7d32;
-  border: 1px solid #66bb6a;
-}
-
-.status-disabled {
-  padding: 4px 12px;
-  border-radius: 12px;
-  font-size: 12px;
-  font-weight: 600;
-  background: #f5f5f5;
-  color: #757575;
-  border: 1px solid #bdbdbd;
-}
-
-.btn-danger {
-  padding: 6px 16px;
-  background: #d32f2f;
-  border: none;
-  border-radius: 6px;
-  color: #ffffff;
-  font-size: 13px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  margin-left: 5px;
-}
-
-.btn-danger:hover {
-  background: #c62828;
-  transform: translateY(-2px);
-  box-shadow: 0 5px 15px rgba(211, 47, 47, 0.3);
-}
-
-.no-data {
-  text-align: center;
-  color: #9e9e9e;
-  font-style: italic;
-  padding: 30px !important;
 }
 </style>

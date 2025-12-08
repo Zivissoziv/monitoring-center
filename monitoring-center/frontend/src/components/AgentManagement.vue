@@ -1,71 +1,83 @@
 <template>
   <div class="agent-management">
-    <div class="section-header">
-      <h2><span class="icon">🖥️</span> 代理管理</h2>
-    </div>
     
-    <div class="agent-form card">
-      <h3>添加新代理</h3>
-      <form @submit.prevent="addAgent">
-        <div class="form-row">
-          <div class="form-group">
-            <label>名称：</label>
-            <input v-model="newAgent.name" required placeholder="输入代理名称" />
-          </div>
-          <div class="form-group">
-            <label>IP地址：</label>
-            <input v-model="newAgent.ip" required placeholder="例如: 192.168.1.100" />
-          </div>
-          <div class="form-group">
-            <label>端口：</label>
-            <input v-model.number="newAgent.port" type="number" required placeholder="8081" />
-          </div>
-          <button type="submit" class="btn-primary">添加代理</button>
+    <el-card class="agent-form" shadow="hover">
+      <template #header>
+        <div class="card-header">
+          <span>添加新代理</span>
         </div>
-      </form>
-    </div>
+      </template>
+      <el-form :model="newAgent" label-width="100px" :inline="true" @submit.prevent="addAgent">
+        <el-form-item label="名称">
+          <el-input v-model="newAgent.name" placeholder="输入代理名称" required style="width: 200px" />
+        </el-form-item>
+        <el-form-item label="IP地址">
+          <el-input v-model="newAgent.ip" placeholder="例如: 192.168.1.100" required style="width: 200px" />
+        </el-form-item>
+        <el-form-item label="端口">
+          <el-input-number v-model="newAgent.port" :min="1" :max="65535" required style="width: 150px" />
+        </el-form-item>
+        <el-form-item>
+          <el-button type="primary" @click="addAgent" :icon="Plus">添加代理</el-button>
+        </el-form-item>
+      </el-form>
+    </el-card>
     
-    <div class="agent-list card">
-      <h3>代理列表</h3>
-      <div class="table-container">
-        <table>
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>名称</th>
-              <th>IP地址</th>
-              <th>端口</th>
-              <th>状态</th>
-              <th>操作</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="agent in agents" :key="agent.id">
-              <td>{{ agent.id }}</td>
-              <td>{{ agent.name }}</td>
-              <td>{{ agent.ip }}</td>
-              <td>{{ agent.port }}</td>
-              <td><span :class="'status status-' + agent.status.toLowerCase()">{{ getStatusText(agent.status) }}</span></td>
-              <td>
-                <button @click="deleteAgent(agent.id)" class="btn-danger">删除</button>
-              </td>
-            </tr>
-            <tr v-if="agents.length === 0">
-              <td colspan="6" class="no-data">暂无代理数据</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
+    <el-card class="agent-list" shadow="hover">
+      <template #header>
+        <div class="card-header">
+          <span>代理列表</span>
+        </div>
+      </template>
+      <el-table :data="agents" stripe style="width: 100%" v-loading="loading">
+        <el-table-column prop="id" label="ID" width="80" />
+        <el-table-column prop="name" label="名称" min-width="150" />
+        <el-table-column prop="ip" label="IP地址" min-width="150" />
+        <el-table-column prop="port" label="端口" width="100" />
+        <el-table-column label="状态" width="120">
+          <template #default="scope">
+            <el-tag :type="getStatusType(scope.row.status)" size="small">
+              {{ getStatusText(scope.row.status) }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="150">
+          <template #default="scope">
+            <el-popconfirm 
+              title="确定要删除该代理吗？" 
+              @confirm="deleteAgent(scope.row.id)"
+              confirm-button-text="确定"
+              cancel-button-text="取消"
+            >
+              <template #reference>
+                <el-button size="small" type="danger" :icon="Delete">删除</el-button>
+              </template>
+            </el-popconfirm>
+          </template>
+        </el-table-column>
+        <template #empty>
+          <el-empty description="暂无代理数据" />
+        </template>
+      </el-table>
+    </el-card>
   </div>
 </template>
 
 <script>
+import { Monitor, Plus, Delete } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
+
 export default {
   name: 'AgentManagement',
+  components: {
+    Monitor,
+    Plus,
+    Delete
+  },
   data() {
     return {
       agents: [],
+      loading: false,
       newAgent: {
         name: '',
         ip: '',
@@ -78,15 +90,24 @@ export default {
   },
   methods: {
     async loadAgents() {
+      this.loading = true
       try {
         const response = await fetch('/api/agents')
         this.agents = await response.json()
       } catch (error) {
         console.error('Error loading agents:', error)
+        ElMessage.error('加载代理列表失败')
+      } finally {
+        this.loading = false
       }
     },
     
     async addAgent() {
+      if (!this.newAgent.name || !this.newAgent.ip || !this.newAgent.port) {
+        ElMessage.warning('请填写完整信息')
+        return
+      }
+      
       try {
         const response = await fetch('/api/agents', {
           method: 'POST',
@@ -100,15 +121,17 @@ export default {
           const agent = await response.json()
           this.agents.push(agent)
           this.newAgent = { name: '', ip: '', port: 8080 }
+          ElMessage.success('代理添加成功')
+        } else {
+          ElMessage.error('代理添加失败')
         }
       } catch (error) {
         console.error('Error adding agent:', error)
+        ElMessage.error('代理添加失败')
       }
     },
     
     async deleteAgent(id) {
-      if (!confirm('确定要删除该代理吗？')) return
-      
       try {
         const response = await fetch(`/api/agents/${id}`, {
           method: 'DELETE'
@@ -116,9 +139,13 @@ export default {
         
         if (response.ok) {
           this.agents = this.agents.filter(agent => agent.id !== id)
+          ElMessage.success('代理删除成功')
+        } else {
+          ElMessage.error('代理删除失败')
         }
       } catch (error) {
         console.error('Error deleting agent:', error)
+        ElMessage.error('代理删除失败')
       }
     },
     
@@ -129,185 +156,48 @@ export default {
         'DISCONNECTED': '断开'
       }
       return statusMap[status] || status
+    },
+    
+    getStatusType(status) {
+      const typeMap = {
+        'ACTIVE': 'success',
+        'INACTIVE': 'warning',
+        'DISCONNECTED': 'danger'
+      }
+      return typeMap[status] || 'info'
     }
   }
 }
 </script>
 
 <style scoped>
-.section-header h2 {
-  color: #1976d2;
-  font-size: 24px;
-  margin-bottom: 25px;
+.page-title {
   display: flex;
   align-items: center;
   gap: 10px;
+  font-size: 20px;
   font-weight: 600;
-}
-
-.section-header .icon {
-  font-size: 28px;
-}
-
-.card {
-  background: rgba(255, 255, 255, 0.95);
-  border: 2px solid #e3f2fd;
-  border-radius: 12px;
-  padding: 25px;
-  margin-bottom: 25px;
-  box-shadow: 0 4px 20px rgba(25, 118, 210, 0.1);
-}
-
-.card h3 {
   color: #1976d2;
-  font-size: 18px;
+}
+
+.agent-management {
+  padding: 20px;
+}
+
+.el-page-header {
+  margin-bottom: 24px;
+}
+
+.agent-form,
+.agent-list {
   margin-bottom: 20px;
-  border-bottom: 2px solid #e3f2fd;
-  padding-bottom: 10px;
-  font-weight: 600;
 }
 
-.form-row {
+.card-header {
   display: flex;
-  gap: 15px;
-  align-items: flex-end;
-  flex-wrap: wrap;
-}
-
-.form-group {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.form-group label {
-  color: #1976d2;
-  font-size: 14px;
+  align-items: center;
+  justify-content: space-between;
   font-weight: 600;
-}
-
-.form-group input {
-  padding: 10px 15px;
-  background: #ffffff;
-  border: 2px solid #e3f2fd;
-  border-radius: 6px;
-  color: #1976d2;
-  font-size: 14px;
-  min-width: 200px;
-  transition: all 0.3s ease;
-}
-
-.form-group input:focus {
-  outline: none;
-  border-color: #1976d2;
-  box-shadow: 0 0 10px rgba(25, 118, 210, 0.2);
-}
-
-.form-group input::placeholder {
-  color: #90caf9;
-}
-
-.btn-primary {
-  padding: 10px 24px;
-  background: #1976d2;
-  border: none;
-  border-radius: 6px;
-  color: #ffffff;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.btn-primary:hover {
-  background: #1565c0;
-  transform: translateY(-2px);
-  box-shadow: 0 5px 20px rgba(25, 118, 210, 0.3);
-}
-
-.table-container {
-  overflow-x: auto;
-}
-
-table {
-  width: 100%;
-  border-collapse: separate;
-  border-spacing: 0;
-}
-
-thead {
-  background: #e3f2fd;
-}
-
-th {
-  padding: 15px;
-  text-align: left;
-  color: #1976d2;
-  font-weight: 600;
-  font-size: 14px;
-  border-bottom: 2px solid #bbdefb;
-}
-
-td {
-  padding: 15px;
-  color: #000000;
-  border-bottom: 1px solid #e3f2fd;
-}
-
-tbody tr {
-  transition: all 0.3s ease;
-}
-
-tbody tr:hover {
-  background: #f5f5f5;
-}
-
-.status {
-  padding: 4px 12px;
-  border-radius: 12px;
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.status-active {
-  background: #e8f5e9;
-  color: #2e7d32;
-  border: 1px solid #66bb6a;
-}
-
-.status-inactive {
-  background: #fff3e0;
-  color: #ef6c00;
-  border: 1px solid #ffa726;
-}
-
-.status-disconnected {
-  background: #ffebee;
-  color: #c62828;
-  border: 1px solid #ef5350;
-}
-
-.btn-danger {
-  padding: 6px 16px;
-  background: #d32f2f;
-  border: none;
-  border-radius: 6px;
-  color: #ffffff;
-  font-size: 13px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.btn-danger:hover {
-  background: #c62828;
-  transform: translateY(-2px);
-  box-shadow: 0 5px 15px rgba(211, 47, 47, 0.3);
-}
-
-.no-data {
-  text-align: center;
-  color: #9e9e9e;
-  font-style: italic;
-  padding: 30px !important;
+  font-size: 16px;
 }
 </style>

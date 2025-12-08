@@ -1,460 +1,407 @@
 <template>
-  <div class="container-wide">
-    <div class="section-header">
-      <h2><span class="icon">📺</span> 监控台</h2>
-    </div>
+  <div class="monitoring-dashboard">
+   
     
     <!-- Summary Cards -->
-    <div class="dashboard-summary card">
-      <div class="summary-card">
-        <div class="card-content">
-          <div class="card-icon">🔔</div>
-          <div class="card-info">
-            <div class="card-title">当前告警</div>
-            <div class="card-value">{{ activeAlertsCount }}</div>
-          </div>
-        </div>
-      </div>
-    </div>
+    <el-row :gutter="20" class="dashboard-summary">
+      <el-col :span="6">
+        <el-card shadow="hover" class="summary-card">
+          <el-statistic title="当前告警" :value="activeAlertsCount">
+            <template #prefix>
+              <el-icon color="#f56c6c"><Bell /></el-icon>
+            </template>
+          </el-statistic>
+        </el-card>
+      </el-col>
+    </el-row>
     
     <!-- Alert Filters -->
-    <div class="card">
-      <h3>告警筛选</h3>
-      <div class="filter-section">
-        <div class="filter-group">
-          <label>指标类型:</label>
-          <select v-model="alertFilters.metricType" @change="filterAlerts" class="filter-select">
-            <option value="">全部</option>
-            <option value="CPU">CPU使用率</option>
-            <option value="MEMORY">内存使用率</option>
-          </select>
+    <el-card shadow="hover" class="filter-card">
+      <template #header>
+        <div class="card-header">
+          <span>告警筛选</span>
         </div>
+      </template>
+      <el-form :inline="true" label-width="100px">
+        <el-form-item label="指标类型">
+          <el-select v-model="alertFilters.metricType" @change="filterAlerts" placeholder="全部" style="width: 150px">
+            <el-option label="全部" value="" />
+            <el-option label="CPU使用率" value="CPU" />
+            <el-option label="内存使用率" value="MEMORY" />
+          </el-select>
+        </el-form-item>
         
-        <div class="filter-group">
-          <label>严重程度:</label>
-          <select v-model="alertFilters.severity" @change="filterAlerts" class="filter-select">
-            <option value="">全部</option>
-            <option value="LOW">低</option>
-            <option value="MEDIUM">中</option>
-            <option value="HIGH">高</option>
-            <option value="CRITICAL">严重</option>
-          </select>
-        </div>
+        <el-form-item label="严重程度">
+          <el-select v-model="alertFilters.severity" @change="filterAlerts" placeholder="全部" style="width: 150px">
+            <el-option label="全部" value="" />
+            <el-option label="低" value="LOW" />
+            <el-option label="中" value="MEDIUM" />
+            <el-option label="高" value="HIGH" />
+            <el-option label="严重" value="CRITICAL" />
+          </el-select>
+        </el-form-item>
         
-        <div class="filter-group">
-          <label>代理IP:</label>
-          <input v-model="alertFilters.agentIp" @input="filterAlerts" placeholder="搜索代理IP" class="filter-input" />
-        </div>
-      </div>
-    </div>
+        <el-form-item label="代理IP">
+          <el-input v-model="alertFilters.agentIp" @input="filterAlerts" placeholder="搜索代理IP" style="width: 200px" />
+        </el-form-item>
+      </el-form>
+    </el-card>
     
     <!-- Active Alerts Table -->
-    <div class="card">
-      <h3>当前告警</h3>
-      <div class="table-container">
-        <table>
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>指标类型</th>
-              <th>代理IP</th>
-              <th>触发值</th>
-              <th>阈值</th>
-              <th>严重程度</th>
-              <th>最后触发</th>
-              <th>触发次数</th>
-              <th>操作</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="alert in filteredAlerts" :key="alert.id">
-              <td>{{ alert.id }}</td>
-              <td><span :class="'metric-type metric-' + alert.metricType.toLowerCase()">{{ getMetricTypeName(alert.metricType) }}</span></td>
-              <td>{{ getAgentIp(alert.agentId) }}</td>
-              <td><span class="metric-value">{{ formatValue(alert.triggerValue) }}</span></td>
-              <td>{{ alert.threshold }}</td>
-              <td><span :class="'severity severity-' + alert.severity.toLowerCase()">{{ getSeverityText(alert.severity) }}</span></td>
-              <td>{{ formatTime(alert.lastTriggeredAt) }}</td>
-              <td>{{ alert.triggerCount }}</td>
-              <td>
-                <button @click="openEmergencyDrawer(alert)" class="btn-primary">应急处理</button>
-              </td>
-            </tr>
-            <tr v-if="filteredAlerts.length === 0">
-              <td colspan="9" class="no-data">暂无告警数据</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
+    <el-card shadow="hover" class="alerts-table">
+      <template #header>
+        <div class="card-header">
+          <span>当前告警</span>
+        </div>
+      </template>
+      <el-table :data="filteredAlerts" stripe style="width: 100%" v-loading="loading">
+        <el-table-column prop="id" label="ID" width="80" />
+        <el-table-column label="指标类型" width="150">
+          <template #default="scope">
+            <el-tag :type="scope.row.metricType === 'CPU' ? 'danger' : 'primary'" size="small">
+              {{ getMetricTypeName(scope.row.metricType) }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="代理IP" min-width="150">
+          <template #default="scope">
+            {{ getAgentIp(scope.row.agentId) }}
+          </template>
+        </el-table-column>
+        <el-table-column label="触发值" width="120">
+          <template #default="scope">
+            <span class="metric-value">{{ formatValue(scope.row.triggerValue) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="threshold" label="阈值" width="100" />
+        <el-table-column label="严重程度" width="120">
+          <template #default="scope">
+            <el-tag :type="getSeverityType(scope.row.severity)" size="small">
+              {{ getSeverityText(scope.row.severity) }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="最后触发" min-width="180">
+          <template #default="scope">
+            {{ formatTime(scope.row.lastTriggeredAt) }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="triggerCount" label="触发次数" width="100" />
+        <el-table-column label="操作" width="150">
+          <template #default="scope">
+            <el-button type="primary" size="small" @click="openEmergencyDrawer(scope.row)">
+              应急处理
+            </el-button>
+          </template>
+        </el-table-column>
+        <template #empty>
+          <el-empty description="暂无告警数据" />
+        </template>
+      </el-table>
+    </el-card>
     
     <!-- Emergency Drawer -->
     <el-drawer v-model="isEmergencyDrawerOpen" title="应急处理指南" direction="rtl" size="700px">
       <div v-if="selectedAlert">
         <!-- Alert Details -->
-        <div class="card mb-3">
-          <h3>告警详情</h3>
-          <el-descriptions :column="3" size="small" border>
+        <el-card class="mb-3" shadow="hover">
+          <template #header>
+            <span style="font-weight: 600; color: #1976d2;">告警详情</span>
+          </template>
+          <el-descriptions :column="2" size="small" border>
             <el-descriptions-item label="告警ID">{{ selectedAlert.id }}</el-descriptions-item>
-            <el-descriptions-item label="指标类型">{{ getMetricTypeName(selectedAlert.metricType) }}</el-descriptions-item>
+            <el-descriptions-item label="指标类型">
+              <el-tag :type="selectedAlert.metricType === 'CPU' ? 'danger' : 'primary'" size="small">
+                {{ getMetricTypeName(selectedAlert.metricType) }}
+              </el-tag>
+            </el-descriptions-item>
             <el-descriptions-item label="代理IP">{{ getAgentIp(selectedAlert.agentId) }}</el-descriptions-item>
             <el-descriptions-item label="触发值">{{ formatValue(selectedAlert.triggerValue) }}</el-descriptions-item>
             <el-descriptions-item label="阈值">{{ selectedAlert.threshold }}</el-descriptions-item>
             <el-descriptions-item label="严重程度">
-              <span :class="'severity severity-' + selectedAlert.severity.toLowerCase()">
+              <el-tag :type="getSeverityType(selectedAlert.severity)" size="small">
                 {{ getSeverityText(selectedAlert.severity) }}
-              </span>
+              </el-tag>
             </el-descriptions-item>
             <el-descriptions-item label="首次触发">{{ formatTime(selectedAlert.firstTriggeredAt) }}</el-descriptions-item>
             <el-descriptions-item label="最后触发">{{ formatTime(selectedAlert.lastTriggeredAt) }}</el-descriptions-item>
-            <el-descriptions-item label="触发次数">{{ selectedAlert.triggerCount }}</el-descriptions-item>
+            <el-descriptions-item label="触发次数" :span="2">{{ selectedAlert.triggerCount }}</el-descriptions-item>
           </el-descriptions>
-        </div>
+        </el-card>
         
-        <!-- Emergency Steps (moved to top) -->
-        <div class="card mb-3">
-          <h3>应急处理步骤</h3>
+        <!-- Emergency Steps -->
+        <el-card class="mb-3" shadow="hover">
+          <template #header>
+            <span style="font-weight: 600; color: #1976d2;">应急处理步骤</span>
+          </template>
           
           <!-- Emergency Knowledge Base -->
           <div v-if="emergencyKnowledge && emergencyKnowledge.steps && emergencyKnowledge.steps.length > 0">
-            <div class="knowledge-header">
-              <h4>{{ emergencyKnowledge.title }}</h4>
-              <p v-if="emergencyKnowledge.description" class="knowledge-description">{{ emergencyKnowledge.description }}</p>
-            </div>
+            <el-alert type="info" :closable="false" style="margin-bottom: 15px;">
+              <template #title>
+                <strong>{{ emergencyKnowledge.title }}</strong>
+              </template>
+              <p v-if="emergencyKnowledge.description" style="margin: 5px 0 0 0;">{{ emergencyKnowledge.description }}</p>
+            </el-alert>
             
-            <div class="steps">
-              <div v-for="(step, index) in emergencyKnowledge.steps" :key="step.id" class="step">
-                <div class="step-number">{{ index + 1 }}</div>
-                <div class="step-content">
-                  <h4>{{ step.description }}</h4>
-                  <div class="step-command">
+            <el-timeline>
+              <el-timeline-item 
+                v-for="(step, index) in emergencyKnowledge.steps" 
+                :key="step.id"
+                :timestamp="`步骤 ${index + 1}`"
+                placement="top"
+              >
+                <el-card shadow="hover">
+                  <template #header>
+                    <div style="font-weight: 600; color: #1976d2;">{{ step.description }}</div>
+                  </template>
+                  
+                  <div class="command-box">
                     <div class="command-label">执行命令：</div>
                     <pre class="command-text">{{ step.linuxCommand }}</pre>
-                    <div class="command-actions">
-                      <button 
+                    <div style="display: flex; gap: 10px; margin-top: 10px;">
+                      <el-button 
+                        size="small"
+                        type="primary"
                         @click="executeStepCommand(step.linuxCommand)" 
+                        :loading="isExecutingCommand && executingCommand === step.linuxCommand"
                         :disabled="isExecutingCommand"
-                        :class="['btn-execute-command', { 'btn-loading': isExecutingCommand && executingCommand === step.linuxCommand }]"
-                        title="直接执行命令"
                       >
-                        {{ isExecutingCommand && executingCommand === step.linuxCommand ? '执行中...' : '⚡ 执行' }}
-                      </button>
-                      <button 
-                        @click="copyCommand(step.linuxCommand)" 
-                        class="btn-copy-command"
-                        title="复制命令"
+                        {{ isExecutingCommand && executingCommand === step.linuxCommand ? '执行中' : '执行' }}
+                      </el-button>
+                      <el-button 
+                        size="small"
+                        @click="copyCommand(step.linuxCommand)"
                       >
-                        📋 复制
-                      </button>
+                        复制命令
+                      </el-button>
                     </div>
-                  </div>
-                  <div v-if="step.dependsOn" class="step-dependency">
-                    <span class="dependency-icon">⚠️</span>
-                    <span>依赖步骤: 步骤 {{ findStepNumber(step.dependsOn) }}</span>
-                  </div>
-                  <div v-if="step.notes" class="step-notes">
-                    <span class="notes-icon">💡</span>
-                    <span>{{ step.notes }}</span>
                   </div>
                   
-                  <!-- Command Result Display (per step) -->
-                  <div v-if="stepResults[index]" class="step-result mt-2">
-                    <div class="result-header">
-                      <span class="result-title">执行结果</span>
-                      <button @click="clearStepResult(index)" class="btn-clear-result">&times;</button>
-                    </div>
-                    <div class="result-summary">
-                      <span>退出码: </span>
-                      <span :class="['exit-code', { 'error-code': stepResults[index].exitCode !== 0 }]">
-                        {{ stepResults[index].exitCode }}
-                      </span>
-                      <span class="result-time"> | {{ formatTime(stepResults[index].timestamp) }}</span>
-                    </div>
-                    <div class="result-tabs">
-                      <button 
-                        :class="['result-tab', { active: stepResultTab[index] === 'output' }]" 
-                        @click="stepResultTab[index] = 'output'"
-                      >
-                        标准输出
-                      </button>
-                      <button 
-                        :class="['result-tab', { active: stepResultTab[index] === 'error' }]" 
-                        @click="stepResultTab[index] = 'error'"
-                      >
-                        错误输出
-                      </button>
-                    </div>
-                    <div class="result-content">
-                      <div v-if="stepResultTab[index] === 'output'">
+                  <el-alert v-if="step.dependsOn" type="warning" :closable="false" style="margin-top: 10px;">
+                    依赖步骤: 步骤 {{ findStepNumber(step.dependsOn) }}
+                  </el-alert>
+                  <el-alert v-if="step.notes" type="info" :closable="false" style="margin-top: 10px;">
+                    {{ step.notes }}
+                  </el-alert>
+                  
+                  <!-- Command Result Display -->
+                  <el-card v-if="stepResults[index]" class="mt-2" shadow="never">
+                    <template #header>
+                      <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span style="font-weight: 600; color: #1976d2;">执行结果</span>
+                        <el-button size="small" text @click="clearStepResult(index)">清除</el-button>
+                      </div>
+                    </template>
+                    <el-descriptions :column="2" size="small">
+                      <el-descriptions-item label="退出码">
+                        <el-tag :type="stepResults[index].exitCode === 0 ? 'success' : 'danger'" size="small">
+                          {{ stepResults[index].exitCode }}
+                        </el-tag>
+                      </el-descriptions-item>
+                      <el-descriptions-item label="执行时间">
+                        {{ formatTime(stepResults[index].timestamp) }}
+                      </el-descriptions-item>
+                    </el-descriptions>
+                    <el-tabs v-model="stepResultTab[index]" style="margin-top: 10px;">
+                      <el-tab-pane label="标准输出" name="output">
                         <pre v-if="stepResults[index].output" class="output-text">{{ stepResults[index].output }}</pre>
-                        <div v-else class="no-output">无标准输出</div>
-                      </div>
-                      <div v-if="stepResultTab[index] === 'error'">
+                        <el-empty v-else description="无标准输出" :image-size="60" />
+                      </el-tab-pane>
+                      <el-tab-pane label="错误输出" name="error">
                         <pre v-if="stepResults[index].error" class="error-text">{{ stepResults[index].error }}</pre>
-                        <div v-else class="no-output">无错误输出</div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
+                        <el-empty v-else description="无错误输出" :image-size="60" />
+                      </el-tab-pane>
+                    </el-tabs>
+                  </el-card>
+                </el-card>
+              </el-timeline-item>
+            </el-timeline>
           </div>
           
           <!-- Default Steps (if no knowledge base) -->
           <div v-else>
-            <p class="no-knowledge-hint">暂无该告警规则的应急知识库，请在应急知识库页面配置。以下为默认应急流程：</p>
-            <div class="steps">
-              <div class="step">
-                <div class="step-number">1</div>
-                <div class="step-content">
-                  <h4>确认告警</h4>
-                  <p>检查当前告警详情，确认告警的真实性和严重程度</p>
-                </div>
-              </div>
-              <div class="step">
-                <div class="step-number">2</div>
-                <div class="step-content">
-                  <h4>定位问题</h4>
-                  <p>根据告警类型和代理IP，登录对应服务器进行问题排查</p>
-                </div>
-              </div>
-              <div class="step">
-                <div class="step-number">3</div>
-                <div class="step-content">
-                  <h4>临时处理</h4>
+            <el-alert type="warning" :closable="false" style="margin-bottom: 15px;">
+              暂无该告警规则的应急知识库，请在应急知识库页面配置。以下为默认应急流程：
+            </el-alert>
+            <el-steps direction="vertical" :active="7">
+              <el-step title="确认告警" description="检查当前告警详情，确认告警的真实性和严重程度" />
+              <el-step title="定位问题" description="根据告警类型和代理IP，登录对应服务器进行问题排查" />
+              <el-step title="临时处理">
+                <template #description>
                   <div v-if="selectedAlert && selectedAlert.metricType === 'CPU'">
-                    <p><strong>CPU告警</strong>: 检查高CPU进程，必要时重启相关服务</p>
+                    <strong>CPU告警</strong>: 检查高CPU进程，必要时重启相关服务
                   </div>
                   <div v-else-if="selectedAlert && selectedAlert.metricType === 'MEMORY'">
-                    <p><strong>内存告警</strong>: 检查内存使用情况，清理缓存或重启应用</p>
+                    <strong>内存告警</strong>: 检查内存使用情况，清理缓存或重启应用
                   </div>
                   <div v-else>
-                    <p><strong>通用处理</strong>: 检查系统资源使用情况，查看应用日志，必要时重启服务</p>
+                    <strong>通用处理</strong>: 检查系统资源使用情况，查看应用日志，必要时重启服务
                   </div>
-                </div>
-              </div>
-              <div class="step">
-                <div class="step-number">4</div>
-                <div class="step-content">
-                  <h4>根因分析</h4>
-                  <p>分析系统日志，找出问题根本原因</p>
-                </div>
-              </div>
-              <div class="step">
-                <div class="step-number">5</div>
-                <div class="step-content">
-                  <h4>永久解决</h4>
-                  <p>根据根因分析结果，实施永久性解决方案</p>
-                </div>
-              </div>
-              <div class="step">
-                <div class="step-number">6</div>
-                <div class="step-content">
-                  <h4>验证恢复</h4>
-                  <p>确认系统恢复正常，监控指标回到正常范围</p>
-                </div>
-              </div>
-              <div class="step">
-                <div class="step-number">7</div>
-                <div class="step-content">
-                  <h4>记录总结</h4>
-                  <p>记录问题处理过程和解决方案，更新知识库</p>
-                </div>
-              </div>
-            </div>
+                </template>
+              </el-step>
+              <el-step title="根因分析" description="分析系统日志，找出问题根本原因" />
+              <el-step title="永久解决" description="根据根因分析结果，实施永久性解决方案" />
+              <el-step title="验证恢复" description="确认系统恢复正常，监控指标回到正常范围" />
+              <el-step title="记录总结" description="记录问题处理过程和解决方案，更新知识库" />
+            </el-steps>
           </div>
-        </div>
+        </el-card>
         
         <!-- Metric Visualization Section -->
-        <div class="card mb-3">
-          <h3>监控指标视图</h3>
-          <div class="toolbar mb-3">
-            <div class="view-toggle">
-              <button :class="['toggle-btn', { active: metricViewMode === 'chart' }]" @click="metricViewMode = 'chart'">
-                📊 图表视图
-              </button>
-              <button :class="['toggle-btn', { active: metricViewMode === 'table' }]" @click="metricViewMode = 'table'">
-                📋 表格视图
-              </button>
+        <el-card class="mb-3" shadow="hover">
+          <template #header>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-weight: 600; color: #1976d2;">监控指标视图</span>
+              <el-radio-group v-model="metricViewMode" size="small">
+                <el-radio-button label="chart">图表视图</el-radio-button>
+                <el-radio-button label="table">表格视图</el-radio-button>
+              </el-radio-group>
             </div>
-          </div>
+          </template>
           
           <!-- Chart View -->
           <div v-if="metricViewMode === 'chart'" style="height:300px">
             <div style="display:flex;justify-content:flex-end;margin-bottom:10px">
-              <button @click="refreshChart" class="btn-secondary" style="padding:5px 10px;font-size:12px">
-                刷新图表
-              </button>
+              <el-button size="small" @click="refreshChart">刷新图表</el-button>
             </div>
             <canvas ref="chartCanvasRef" style="width:100%;height:calc(100% - 40px)"></canvas>
           </div>
           
           <!-- Table View -->
-          <div v-if="metricViewMode === 'table'" class="metric-table-container">
-            <div class="table-wrapper">
-              <table class="metric-table">
-                <thead>
-                  <tr>
-                    <th>时间</th>
-                    <th>数值</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="metric in paginatedMetrics" :key="metric.id">
-                    <td>{{ formatTime(metric.timestamp) }}</td>
-                    <td><span class="metric-value">{{ formatValue(metric.value) }}</span></td>
-                  </tr>
-                  <tr v-if="paginatedMetrics.length === 0">
-                    <td colspan="2" class="no-data">暂无数据</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-            <div class="pagination-wrapper">
-              <div class="pagination-controls">
-                <button 
-                  :disabled="currentPage === 1" 
-                  @click="handlePageChange(currentPage - 1)"
-                  class="pagination-btn"
-                >
-                  上一页
-                </button>
-                <span class="pagination-info">
-                  第 {{ currentPage }} 页，共 {{ Math.ceil(totalMetrics / itemsPerPage) }} 页
-                </span>
-                <button 
-                  :disabled="currentPage >= Math.ceil(totalMetrics / itemsPerPage)" 
-                  @click="handlePageChange(currentPage + 1)"
-                  class="pagination-btn"
-                >
-                  下一页
-                </button>
-              </div>
+          <div v-if="metricViewMode === 'table'">
+            <el-table :data="paginatedMetrics" stripe style="width: 100%" size="small">
+              <el-table-column label="时间" min-width="180">
+                <template #default="scope">
+                  {{ formatTime(scope.row.timestamp) }}
+                </template>
+              </el-table-column>
+              <el-table-column label="数值" width="120">
+                <template #default="scope">
+                  <span class="metric-value">{{ formatValue(scope.row.value) }}</span>
+                </template>
+              </el-table-column>
+              <template #empty>
+                <el-empty description="暂无数据" :image-size="60" />
+              </template>
+            </el-table>
+            <div style="margin-top: 15px; display: flex; justify-content: center;">
+              <el-pagination
+                v-model:current-page="currentPage"
+                :page-size="itemsPerPage"
+                :total="totalMetrics"
+                layout="prev, pager, next, total"
+                small
+                @current-change="handlePageChange"
+              />
             </div>
           </div>
-        </div>
+        </el-card>
         
-        <!-- Command Execution Section (Collapsible) -->
-        <div class="card mb-3">
-          <div class="collapsible-header" @click="showCommandWindow = !showCommandWindow">
-            <h3 style="margin: 0; cursor: pointer;">
-              <span class="collapse-icon">{{ showCommandWindow ? '▼' : '▶' }}</span>
-              命令执行窗口
-            </h3>
-          </div>
+        <!-- Command Execution Section -->
+        <el-card class="mb-3" shadow="hover">
+          <template #header>
+            <div @click="showCommandWindow = !showCommandWindow" style="cursor: pointer; display: flex; align-items: center; gap: 8px;">
+              <el-icon>
+                <component :is="showCommandWindow ? 'ArrowDown' : 'ArrowRight'" />
+              </el-icon>
+              <span style="font-weight: 600; color: #1976d2;">命令执行窗口</span>
+            </div>
+          </template>
           
-          <div v-show="showCommandWindow" class="collapsible-content">
-            <div class="form-group">
-              <label>目标代理:</label>
-              <input v-model="commandForm.agentInfo" disabled class="form-input" />
-            </div>
-            <div class="form-group">
-              <label>执行命令:</label>
-              <textarea
-                v-model="commandForm.command"
-                placeholder="输入要执行的Linux命令，例如: ps aux | grep java"
-                class="form-textarea"
-                rows="3"
-              ></textarea>
-            </div>
-            <div class="form-actions">
-              <button 
-                @click="executeCommand" 
-                :disabled="!commandForm.command.trim() || isExecutingCommand"
-                :class="['btn-primary', { 'btn-loading': isExecutingCommand }]"
-              >
-                {{ isExecutingCommand ? '执行中...' : '执行命令' }}
-              </button>
-              <button @click="clearCommandResult" :disabled="!commandResult" class="btn-secondary">
-                清空结果
-              </button>
-            </div>
-            
-            <!-- Command Result Display -->
-            <div v-if="commandResult" class="mt-3">
-              <div class="card">
-                <h3>执行结果</h3>
-                <div class="result-details">
-                  <div class="result-item">
-                    <span class="result-label">命令:</span>
-                    <span class="result-value">{{ commandResult.command }}</span>
-                  </div>
-                  <div class="result-item">
-                    <span class="result-label">退出码:</span>
-                    <span :class="['result-value', { 'error-code': commandResult.exitCode !== 0 }]">
+          <el-collapse-transition>
+            <div v-show="showCommandWindow">
+              <el-form label-width="100px">
+                <el-form-item label="目标代理">
+                  <el-input v-model="commandForm.agentInfo" disabled />
+                </el-form-item>
+                <el-form-item label="执行命令">
+                  <el-input
+                    v-model="commandForm.command"
+                    type="textarea"
+                    :rows="3"
+                    placeholder="输入要执行的Linux命令，例如: ps aux | grep java"
+                  />
+                </el-form-item>
+                <el-form-item>
+                  <el-button 
+                    type="primary"
+                    @click="executeCommand" 
+                    :disabled="!commandForm.command.trim() || isExecutingCommand"
+                    :loading="isExecutingCommand"
+                  >
+                    {{ isExecutingCommand ? '执行中' : '执行命令' }}
+                  </el-button>
+                  <el-button @click="clearCommandResult" :disabled="!commandResult">
+                    清空结果
+                  </el-button>
+                </el-form-item>
+              </el-form>
+              
+              <!-- Command Result Display -->
+              <el-card v-if="commandResult" shadow="never" style="margin-top: 15px;">
+                <template #header>
+                  <span style="font-weight: 600; color: #1976d2;">执行结果</span>
+                </template>
+                <el-descriptions :column="2" size="small" border>
+                  <el-descriptions-item label="命令" :span="2">{{ commandResult.command }}</el-descriptions-item>
+                  <el-descriptions-item label="退出码">
+                    <el-tag :type="commandResult.exitCode === 0 ? 'success' : 'danger'" size="small">
                       {{ commandResult.exitCode }}
-                    </span>
-                  </div>
-                  <div class="result-item">
-                    <span class="result-label">执行时间:</span>
-                    <span class="result-value">{{ formatTime(commandResult.timestamp) }}</span>
-                  </div>
-                </div>
+                    </el-tag>
+                  </el-descriptions-item>
+                  <el-descriptions-item label="执行时间">{{ formatTime(commandResult.timestamp) }}</el-descriptions-item>
+                </el-descriptions>
                 
-                <div class="mt-3">
-                  <div class="tabs">
-                    <button 
-                      :class="['tab-btn', { active: activeTab === 'output' }]" 
-                      @click="activeTab = 'output'"
-                    >
-                      标准输出
-                    </button>
-                    <button 
-                      :class="['tab-btn', { active: activeTab === 'error' }]" 
-                      @click="activeTab = 'error'"
-                    >
-                      错误输出
-                    </button>
-                  </div>
-                  
-                  <div class="tab-content">
-                    <div v-if="activeTab === 'output'">
-                      <pre v-if="commandResult.output" class="output-text">{{ commandResult.output }}</pre>
-                      <div v-else class="no-output">无标准输出</div>
-                    </div>
-                    <div v-if="activeTab === 'error'">
-                      <pre v-if="commandResult.error" class="error-text">{{ commandResult.error }}</pre>
-                      <div v-else class="no-output">无错误输出</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
+                <el-tabs v-model="activeTab" style="margin-top: 15px;">
+                  <el-tab-pane label="标准输出" name="output">
+                    <pre v-if="commandResult.output" class="output-text">{{ commandResult.output }}</pre>
+                    <el-empty v-else description="无标准输出" :image-size="60" />
+                  </el-tab-pane>
+                  <el-tab-pane label="错误输出" name="error">
+                    <pre v-if="commandResult.error" class="error-text">{{ commandResult.error }}</pre>
+                    <el-empty v-else description="无错误输出" :image-size="60" />
+                  </el-tab-pane>
+                </el-tabs>
+              </el-card>
             </div>
-          </div>
-        </div>
+          </el-collapse-transition>
+        </el-card>
         
         <!-- Contact Info -->
-        <div class="card">
-          <h3>紧急联系方式</h3>
-          <div class="contact-info">
-            <div class="contact-item">
-              <span class="contact-label">系统管理员:</span>
-              <span class="contact-value">张三 - 138****1234</span>
-            </div>
-            <div class="contact-item">
-              <span class="contact-label">网络管理员:</span>
-              <span class="contact-value">李四 - 139****5678</span>
-            </div>
-            <div class="contact-item">
-              <span class="contact-label">值班电话:</span>
-              <span class="contact-value">010-12345678</span>
-            </div>
-          </div>
-        </div>
+        <el-card shadow="hover">
+          <template #header>
+            <span style="font-weight: 600; color: #1976d2;">紧急联系方式</span>
+          </template>
+          <el-descriptions :column="1" border>
+            <el-descriptions-item label="系统管理员">张三 - 138****1234</el-descriptions-item>
+            <el-descriptions-item label="网络管理员">李四 - 139****5678</el-descriptions-item>
+            <el-descriptions-item label="值班电话">010-12345678</el-descriptions-item>
+          </el-descriptions>
+        </el-card>
       </div>
     </el-drawer>
   </div>
 </template>
 
 <script>
+import { DataBoard, Bell, ArrowDown, ArrowRight } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
 import { Chart } from 'chart.js/auto'
 import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 
 export default {
   name: 'MonitoringDashboard',
+  components: {
+    DataBoard,
+    Bell,
+    ArrowDown,
+    ArrowRight
+  },
   setup() {
     const alerts = ref([])
     const agents = ref([])
+    const loading = ref(false)
     const refreshInterval = ref(null)
     const alertFilters = ref({
       agentIp: '',
@@ -617,6 +564,7 @@ export default {
     
     // Methods
     const loadData = async () => {
+      loading.value = true
       try {
         // Load active alerts only
         const alertsResponse = await fetch('/api/alerts/active')
@@ -627,6 +575,9 @@ export default {
         agents.value = await agentsResponse.json()
       } catch (error) {
         console.error('Error loading dashboard data:', error)
+        ElMessage.error('加载数据失败')
+      } finally {
+        loading.value = false
       }
     }
     
@@ -867,6 +818,16 @@ export default {
       return severityMap[severity] || severity
     }
     
+    const getSeverityType = (severity) => {
+      const typeMap = {
+        'LOW': 'success',
+        'MEDIUM': 'warning',
+        'HIGH': 'warning',
+        'CRITICAL': 'danger'
+      }
+      return typeMap[severity] || 'info'
+    }
+    
     const formatValue = (value) => {
       return value.toFixed(2) + '%'
     }
@@ -1086,6 +1047,8 @@ export default {
       
       // Methods
       getAgentIp,
+      getSeverityType,
+      loading,
       getMetricTypeName,
       getSeverityText,
       formatValue,
@@ -1112,7 +1075,100 @@ export default {
 </script>
 
 <style scoped>
-/* 移除原有的样式定义，使用全局统一的样式 */
+.page-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 20px;
+  font-weight: 600;
+  color: #1976d2;
+}
+
+.monitoring-dashboard {
+  padding: 20px;
+}
+
+.el-page-header {
+  margin-bottom: 24px;
+}
+
+.dashboard-summary {
+  margin-bottom: 20px;
+}
+
+.filter-card,
+.alerts-table {
+  margin-bottom: 20px;
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-weight: 600;
+  font-size: 16px;
+}
+
+.metric-value {
+  font-weight: 600;
+  color: #1976d2;
+}
+
+.mb-3 {
+  margin-bottom: 16px;
+}
+
+.mt-2 {
+  margin-top: 12px;
+}
+
+.command-box {
+  background: #f5f5f5;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  padding: 12px;
+}
+
+.command-label {
+  color: #1976d2;
+  font-weight: 600;
+  font-size: 13px;
+  margin-bottom: 8px;
+}
+
+.command-text {
+  background: #263238;
+  color: #4caf50;
+  padding: 10px;
+  border-radius: 4px;
+  font-family: 'Courier New', monospace;
+  font-size: 13px;
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-all;
+  line-height: 1.5;
+}
+
+.output-text,
+.error-text {
+  background: #f5f5f5;
+  padding: 10px;
+  border-radius: 4px;
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+  max-height: 200px;
+  overflow-y: auto;
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.error-text {
+  background: #fff3f3;
+  color: #f56c6c;
+}
+
+/* General Card Styles */
 .section-header h2 {
   color: #1976d2;
   font-size: 24px;

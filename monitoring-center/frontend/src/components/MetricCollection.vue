@@ -1,31 +1,26 @@
 <template>
   <div class="metric-collection">
-    <div class="section-header">
-      <h2><span class="icon">📈</span> 监控指标</h2>
-    </div>
+    
     
     <!-- Filter and View Controls -->
-    <div class="control-panel card">
-      <div class="filter-section">
-        <div class="filter-group">
-          <label>指标类型:</label>
+    <el-card class="control-panel" shadow="hover">
+      <el-form :inline="true" label-width="90px">
+        <el-form-item label="指标类型">
           <el-select v-model="selectedMetricType" @change="filterMetrics" placeholder="选择指标类型" style="width: 150px">
             <el-option label="全部指标" value="ALL" />
             <el-option label="CPU使用率" value="CPU" />
             <el-option label="内存使用率" value="MEMORY" />
           </el-select>
-        </div>
+        </el-form-item>
         
-        <div class="filter-group">
-          <label>代理:</label>
+        <el-form-item label="代理">
           <el-select v-model="selectedAgent" @change="filterMetrics" placeholder="选择代理" style="width: 150px">
             <el-option label="全部代理" value="ALL" />
             <el-option v-for="agentId in uniqueAgentIds" :key="agentId" :label="`代理 ${agentId}`" :value="agentId" />
           </el-select>
-        </div>
+        </el-form-item>
         
-        <div class="filter-group">
-          <label>时间范围:</label>
+        <el-form-item label="时间范围">
           <el-date-picker
             v-model="timeRange"
             type="datetimerange"
@@ -37,82 +32,87 @@
             @change="filterMetrics"
             style="width: 380px"
           />
-        </div>
+        </el-form-item>
         
-        <div class="filter-group">
-          <el-button type="primary" @click="setQuickRange('1h')" size="small">最近1小时</el-button>
-          <el-button type="primary" @click="setQuickRange('24h')" size="small">最近24小时</el-button>
-          <el-button type="primary" @click="setQuickRange('7d')" size="small">最近7天</el-button>
-          <el-button type="info" @click="clearTimeRange" size="small">清除时间</el-button>
-        </div>
-      </div>
+        <el-form-item>
+          <el-button-group>
+            <el-button type="primary" @click="setQuickRange('1h')" size="small">最近1小时</el-button>
+            <el-button type="primary" @click="setQuickRange('24h')" size="small">最近24小时</el-button>
+            <el-button type="primary" @click="setQuickRange('7d')" size="small">最近7天</el-button>
+            <el-button type="info" @click="clearTimeRange" size="small">清除时间</el-button>
+          </el-button-group>
+        </el-form-item>
+      </el-form>
       
       <div class="view-toggle">
-        <button 
-          :class="['toggle-btn', { active: viewMode === 'table' }]" 
-          @click="viewMode = 'table'"
-        >
-          📋 表格视图
-        </button>
-        <button 
-          :class="['toggle-btn', { active: viewMode === 'chart' }]" 
-          @click="viewMode = 'chart'"
-        >
-          📊 图表视图
-        </button>
+        <el-radio-group v-model="viewMode" size="default">
+          <el-radio-button label="table">
+            <el-icon><Grid /></el-icon>
+            <span>表格视图</span>
+          </el-radio-button>
+          <el-radio-button label="chart">
+            <el-icon><TrendCharts /></el-icon>
+            <span>图表视图</span>
+          </el-radio-button>
+        </el-radio-group>
       </div>
-    </div>
+    </el-card>
     
     <!-- Table View -->
-    <div v-if="viewMode === 'table'" class="metric-view card">
-      <h3>监控数据表格</h3>
-      <div v-if="paginatedMetrics.length === 0" class="no-data-message">
-        <p>📊 暂无符合条件的监控数据</p>
-      </div>
-      <div v-else class="table-container">
-        <table>
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>代理ID</th>
-              <th>指标类型</th>
-              <th>数值</th>
-              <th>时间戳</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="metric in paginatedMetrics" :key="metric.id">
-              <td>{{ metric.id }}</td>
-              <td>{{ metric.agentId }}</td>
-              <td><span :class="'metric-type metric-' + metric.metricType.toLowerCase()">{{ getMetricTypeName(metric.metricType) }}</span></td>
-              <td><span class="metric-value">{{ formatValue(metric.value, metric.metricType) }}</span></td>
-              <td>{{ formatTime(metric.timestamp) }}</td>
-            </tr>
-          </tbody>
-        </table>
-        
-        <!-- Pagination Controls -->
-        <div class="pagination-controls">
-          <el-pagination
-            v-model:current-page="currentPage"
-            v-model:page-size="pageSize"
-            :total="totalMetrics"
-            layout="prev, pager, next, jumper, ->, total"
-            background
-            @current-change="handlePageChange"
-          />
+    <el-card v-if="viewMode === 'table'" class="metric-view" shadow="hover" v-loading="loading">
+      <template #header>
+        <div class="card-header">
+          <span>监控数据表格</span>
         </div>
+      </template>
+      <el-table :data="paginatedMetrics" stripe style="width: 100%">
+        <el-table-column prop="id" label="ID" width="80" />
+        <el-table-column prop="agentId" label="代理ID" width="100" />
+        <el-table-column label="指标类型" width="150">
+          <template #default="scope">
+            <el-tag :type="scope.row.metricType === 'CPU' ? 'danger' : 'primary'" size="small">
+              {{ getMetricTypeName(scope.row.metricType) }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="数值" width="150">
+          <template #default="scope">
+            <span class="metric-value">{{ formatValue(scope.row.value, scope.row.metricType) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="时间戳" min-width="180">
+          <template #default="scope">
+            {{ formatTime(scope.row.timestamp) }}
+          </template>
+        </el-table-column>
+        <template #empty>
+          <el-empty description="暂无符合条件的监控数据" />
+        </template>
+      </el-table>
+      
+      <div class="pagination-controls">
+        <el-pagination
+          v-model:current-page="currentPage"
+          v-model:page-size="pageSize"
+          :total="totalMetrics"
+          layout="prev, pager, next, jumper, ->, total"
+          background
+          @current-change="handlePageChange"
+        />
       </div>
-    </div>
+    </el-card>
     
     <!-- Chart View -->
-    <div v-if="viewMode === 'chart'" class="metric-view card">
-      <h3>监控数据图表</h3>
-      <div v-if="filteredMetrics.length === 0" class="no-data-message">
-        <p>📊 暂无符合条件的监控数据</p>
+    <el-card v-if="viewMode === 'chart'" class="metric-view" shadow="hover" v-loading="loading">
+      <template #header>
+        <div class="card-header">
+          <span>监控数据图表</span>
+        </div>
+      </template>
+      <div v-if="filteredMetrics.length === 0">
+        <el-empty description="暂无符合条件的监控数据" />
       </div>
       <div v-else class="charts-grid">
-        <!-- Individual charts for each metric type and agent combination -->
         <div 
           v-for="(chartData, index) in individualCharts" 
           :key="index" 
@@ -123,23 +123,30 @@
           </div>
         </div>
       </div>
-    </div>
+    </el-card>
   </div>
 </template>
 
 <script>
+import { TrendCharts, Grid } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
 import { Chart } from 'chart.js/auto'
 
 export default {
   name: 'MetricCollection',
+  components: {
+    TrendCharts,
+    Grid
+  },
   data() {
     return {
       metrics: [],
       filteredMetrics: [],
+      loading: false,
       selectedMetricType: 'ALL',
       selectedAgent: 'ALL',
-      timeRange: null, // Now stores [startTime, endTime] as timestamps
-      viewMode: 'table', // 'table' or 'chart'
+      timeRange: null,
+      viewMode: 'table',
       chartInstances: [],
       currentPage: 1,
       pageSize: 10,
@@ -238,6 +245,7 @@ export default {
     },
     
     async loadPaginatedData() {
+      this.loading = true
       try {
         const page = this.currentPage - 1 // Backend uses 0-based indexing
         const size = this.pageSize
@@ -312,7 +320,9 @@ export default {
         this.filteredMetrics.sort((a, b) => b.timestamp - a.timestamp)
       } catch (error) {
         console.error('Error loading paginated data:', error)
-        this.$message.error('加载数据失败')
+        ElMessage.error('加载数据失败')
+      } finally {
+        this.loading = false
       }
     },
     
@@ -506,62 +516,45 @@ export default {
 </script>
 
 <style scoped>
-.control-panel {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 20px;
-  margin-bottom: 20px;
-}
-
-.filter-section {
-  display: flex;
-  gap: 15px;
-  flex-wrap: wrap;
-  align-items: center;
-}
-
-.filter-group {
+.page-title {
   display: flex;
   align-items: center;
-  gap: 8px;
-}
-
-.filter-group label {
+  gap: 10px;
+  font-size: 20px;
   font-weight: 600;
   color: #1976d2;
-  font-size: 14px;
-  white-space: nowrap;
+}
+
+.metric-collection {
+  padding: 20px;
+}
+
+.el-page-header {
+  margin-bottom: 24px;
+}
+
+.control-panel {
+  margin-bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
 .view-toggle {
   display: flex;
-  gap: 10px;
+  justify-content: flex-end;
 }
 
-.toggle-btn {
-  padding: 10px 20px;
-  border: 2px solid #1976d2;
-  border-radius: 6px;
-  background: #ffffff;
-  color: #1976d2;
-  font-size: 14px;
+.metric-view {
+  margin-bottom: 20px;
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  white-space: nowrap;
-}
-
-.toggle-btn:hover {
-  background: #e3f2fd;
-  border-color: #0d47a1;
-}
-
-.toggle-btn.active {
-  background: #1976d2;
-  color: #ffffff;
-  border-color: #1976d2;
+  font-size: 16px;
 }
 
 .pagination-controls {
@@ -572,7 +565,7 @@ export default {
 
 .charts-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
   gap: 20px;
   margin-top: 20px;
 }
@@ -581,101 +574,18 @@ export default {
   background: #f9f9f9;
   border-radius: 8px;
   padding: 15px;
+  min-height: 350px;
 }
 
 .chart-container {
   position: relative;
-  height: 300px;
+  height: 320px;
   width: 100%;
-}
-
-.metric-view table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-.metric-view th, .metric-view td {
-  border: 1px solid #e0e0e0;
-  padding: 8px;
-  text-align: left;
-  color: #1976d2;
-}
-
-.metric-view th {
-  background-color: #e3f2fd;
-  color: #1976d2;
-}
-
-.no-data-message {
-  text-align: center;
-  padding: 60px 20px;
-  color: #9e9e9e;
-  font-size: 16px;
-  font-weight: 600;
-}
-
-.no-data-message p {
-  margin: 0;
-}
-
-.metric-type {
-  padding: 4px 12px;
-  border-radius: 12px;
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.metric-cpu {
-  background: #ffebee;
-  color: #c62828;
-  border: 1px solid #ef5350;
-}
-
-.metric-memory {
-  background: #e3f2fd;
-  color: #1976d2;
-  border: 1px solid #64b5f6;
 }
 
 .metric-value {
   font-weight: 600;
   color: #1976d2;
   font-size: 15px;
-}
-
-.section-header h2 {
-  color: #1976d2;
-  font-size: 24px;
-  margin-bottom: 25px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-weight: 600;
-}
-
-.section-header .icon {
-  font-size: 28px;
-}
-
-.card {
-  background: rgba(255, 255, 255, 0.95);
-  border: 2px solid #e3f2fd;
-  border-radius: 12px;
-  padding: 25px;
-  margin-bottom: 25px;
-  box-shadow: 0 4px 20px rgba(25, 118, 210, 0.1);
-}
-
-.card h3 {
-  color: #1976d2;
-  font-size: 18px;
-  margin-bottom: 20px;
-  border-bottom: 2px solid #e3f2fd;
-  padding-bottom: 10px;
-  font-weight: 600;
-}
-
-.table-container {
-  overflow-x: auto;
 }
 </style>
