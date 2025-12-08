@@ -107,21 +107,25 @@ public class AlertCheckJob implements Job {
     }
     
     private void handleTriggeredAlert(AlertRule rule, Metric metric) {
-        // Check if alert already exists
-        Alert existingAlert = alertRepository.findByAlertRuleIdAndAgentId(
-                rule.getId(), metric.getAgentId()).orElse(null);
+        // Only look for ACTIVE or ACKNOWLEDGED alerts (not RESOLVED)
+        Alert existingAlert = alertRepository.findByAlertRuleIdAndAgentIdAndStatusIn(
+                rule.getId(), 
+                metric.getAgentId(), 
+                java.util.Arrays.asList("ACTIVE", "ACKNOWLEDGED")
+        ).orElse(null);
         
-        if (existingAlert != null && "ACTIVE".equals(existingAlert.getStatus())) {
-            // Update existing alert
+        if (existingAlert != null) {
+            // Update existing active or acknowledged alert
             existingAlert.setLastTriggeredAt(System.currentTimeMillis());
             existingAlert.setTriggerCount(existingAlert.getTriggerCount() + 1);
             existingAlert.setTriggerValue(metric.getValue());
             alertRepository.save(existingAlert);
             
-            log.debug("Updated existing alert for rule {} on agent {}", 
-                    rule.getId(), metric.getAgentId());
-        } else if (existingAlert == null) {
-            // Create new alert
+            log.debug("Updated existing {} alert for rule {} on agent {}", 
+                    existingAlert.getStatus(), rule.getId(), metric.getAgentId());
+        } else {
+            // No active/acknowledged alert exists, create a new one
+            // This includes the case where a previous alert was RESOLVED
             Alert newAlert = new Alert(
                     rule.getId(),
                     metric.getAgentId(),
@@ -168,6 +172,7 @@ public class AlertCheckJob implements Job {
                 // Has recent metrics but they don't violate the condition - auto-resolve
                 alert.setStatus("RESOLVED");
                 alert.setResolveNote("Auto-resolved: condition no longer met");
+                alert.setResolvedAt(System.currentTimeMillis());
                 alertRepository.save(alert);
                 
                 log.info("Auto-resolved alert {} for agent {} - recent metrics no longer violate condition (rule: {})",
@@ -176,6 +181,7 @@ public class AlertCheckJob implements Job {
                 // No recent metrics for this agent - auto-resolve
                 alert.setStatus("RESOLVED");
                 alert.setResolveNote("Auto-resolved: no recent metrics");
+                alert.setResolvedAt(System.currentTimeMillis());
                 alertRepository.save(alert);
                 
                 log.info("Auto-resolved alert {} for agent {} - no recent metrics (rule: {})",

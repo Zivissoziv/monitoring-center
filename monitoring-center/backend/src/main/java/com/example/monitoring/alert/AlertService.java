@@ -96,37 +96,23 @@ public class AlertService {
      * Note: If existing alert is RESOLVED, create a new alert instead of reactivating
      */
     private void recordAlert(AlertRule rule, Metric metric) {
-        Optional<Alert> existingAlert = alertRepository.findByAlertRuleIdAndAgentId(
-                rule.getId(), metric.getAgentId());
+        // Only look for ACTIVE or ACKNOWLEDGED alerts (not RESOLVED)
+        Optional<Alert> existingAlert = alertRepository.findByAlertRuleIdAndAgentIdAndStatusIn(
+                rule.getId(), 
+                metric.getAgentId(),
+                java.util.Arrays.asList("ACTIVE", "ACKNOWLEDGED"));
 
         if (existingAlert.isPresent()) {
             Alert alert = existingAlert.get();
             
-            // If alert was RESOLVED (closed), create a new alert instead of reactivating
-            if ("RESOLVED".equals(alert.getStatus())) {
-                // Delete the UNIQUE constraint entry by removing the old resolved alert
-                alertRepository.delete(alert);
-                
-                // Create new alert
-                Alert newAlert = new Alert(
-                        rule.getId(),
-                        metric.getAgentId(),
-                        rule.getName(),
-                        metric.getMetricType(),
-                        metric.getValue(),
-                        rule.getThreshold(),
-                        rule.getSeverity()
-                );
-                alertRepository.save(newAlert);
-            } else {
-                // Update existing active/acknowledged alert
-                alert.setTriggerValue(metric.getValue());
-                alert.setLastTriggeredAt(System.currentTimeMillis());
-                alert.setTriggerCount(alert.getTriggerCount() + 1);
-                alertRepository.save(alert);
-            }
+            // Update existing active/acknowledged alert
+            alert.setTriggerValue(metric.getValue());
+            alert.setLastTriggeredAt(System.currentTimeMillis());
+            alert.setTriggerCount(alert.getTriggerCount() + 1);
+            alertRepository.save(alert);
         } else {
-            // Create new alert
+            // No active/acknowledged alert exists, create a new one
+            // This includes the case where a previous alert was RESOLVED
             Alert alert = new Alert(
                     rule.getId(),
                     metric.getAgentId(),
@@ -171,6 +157,7 @@ public class AlertService {
 
         alert.setStatus("RESOLVED");
         alert.setResolveNote(resolveNote);
+        alert.setResolvedAt(System.currentTimeMillis());
 
         return alertRepository.save(alert);
     }

@@ -7,8 +7,7 @@ import lombok.NoArgsConstructor;
 import javax.persistence.*;
 
 @Entity
-@Table(name = "alerts", 
-       uniqueConstraints = @UniqueConstraint(columnNames = {"alert_rule_id", "agent_id"}))
+@Table(name = "alerts")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -35,6 +34,7 @@ public class Alert {
     private String acknowledgedBy;
     private long acknowledgedAt;
     private String resolveNote;
+    private Long resolvedAt;
     
     public Alert(Long alertRuleId, String agentId, String ruleName, String metricType, 
                  double triggerValue, double threshold, String severity) {

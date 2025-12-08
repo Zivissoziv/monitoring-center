@@ -45,7 +45,7 @@ CREATE TABLE IF NOT EXISTS alerts (
     acknowledged_by VARCHAR(255),
     acknowledged_at BIGINT,
     resolve_note VARCHAR(1000),
-    UNIQUE INDEX unique_alert_rule_agent (alert_rule_id, agent_id)
+    resolved_at BIGINT
 );
 
 -- Emergency Knowledge Table
