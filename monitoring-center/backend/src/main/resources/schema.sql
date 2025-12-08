@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS metrics (
     agent_id VARCHAR(36) NOT NULL,
     metric_type VARCHAR(255) NOT NULL,
     metric_value DOUBLE NOT NULL,
+    text_value VARCHAR(1000),
     timestamp BIGINT NOT NULL
 );
 
@@ -23,7 +24,8 @@ CREATE TABLE IF NOT EXISTS alert_rules (
     agent_id VARCHAR(36),
     metric_type VARCHAR(255) NOT NULL,
     condition VARCHAR(10) NOT NULL,
-    threshold DOUBLE NOT NULL,
+    threshold DOUBLE,
+    threshold_text VARCHAR(500),
     severity VARCHAR(50) NOT NULL,
     enabled BOOLEAN DEFAULT TRUE
 );
@@ -35,8 +37,10 @@ CREATE TABLE IF NOT EXISTS alerts (
     agent_id VARCHAR(36) NOT NULL,
     rule_name VARCHAR(255) NOT NULL,
     metric_type VARCHAR(255) NOT NULL,
-    trigger_value DOUBLE NOT NULL,
-    threshold DOUBLE NOT NULL,
+    trigger_value DOUBLE,
+    trigger_value_text VARCHAR(1000),
+    threshold DOUBLE,
+    threshold_text VARCHAR(500),
     severity VARCHAR(50) NOT NULL,
     status VARCHAR(50) DEFAULT 'ACTIVE',
     first_triggered_at BIGINT NOT NULL,
@@ -76,6 +80,7 @@ CREATE TABLE IF NOT EXISTS metric_definitions (
     metric_name VARCHAR(255) NOT NULL UNIQUE,
     display_name VARCHAR(255) NOT NULL,
     description VARCHAR(2000),
+    metric_type VARCHAR(20) DEFAULT 'NUMERIC',
     collection_command VARCHAR(2000) NOT NULL,
     collection_interval INT DEFAULT 30,
     processing_rule VARCHAR(2000),
@@ -112,19 +117,19 @@ CREATE INDEX IF NOT EXISTS idx_agent_metric_configs_agent ON agent_metric_config
 CREATE INDEX IF NOT EXISTS idx_agent_metric_configs_metric ON agent_metric_configs(metric_name);
 
 -- Insert default metric definitions
-INSERT INTO metric_definitions (metric_name, display_name, description, collection_command, collection_interval, processing_rule, unit, enabled, created_at, updated_at)
-SELECT 'CPU', 'CPU Usage', 'CPU usage percentage', 'top -bn1 | awk ''/Cpu/{print 100-$8}''', 60, NULL, '%', TRUE, CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT), CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)
+INSERT INTO metric_definitions (metric_name, display_name, description, metric_type, collection_command, collection_interval, processing_rule, unit, enabled, created_at, updated_at)
+SELECT 'CPU', 'CPU Usage', 'CPU usage percentage', 'NUMERIC', 'top -bn1 | awk ''/Cpu/{print 100-$8}''', 60, NULL, '%', TRUE, CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT), CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)
 WHERE NOT EXISTS (SELECT 1 FROM metric_definitions WHERE metric_name = 'CPU');
 
-INSERT INTO metric_definitions (metric_name, display_name, description, collection_command, collection_interval, processing_rule, unit, enabled, created_at, updated_at)
-SELECT 'MEMORY', 'Memory Usage', 'Memory usage percentage', 'free | awk ''/Mem/{printf "%.2f", $3/$2*100}''', 60, NULL, '%', TRUE, CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT), CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)
+INSERT INTO metric_definitions (metric_name, display_name, description, metric_type, collection_command, collection_interval, processing_rule, unit, enabled, created_at, updated_at)
+SELECT 'MEMORY', 'Memory Usage', 'Memory usage percentage', 'NUMERIC', 'free | awk ''/Mem/{printf "%.2f", $3/$2*100}''', 60, NULL, '%', TRUE, CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT), CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)
 WHERE NOT EXISTS (SELECT 1 FROM metric_definitions WHERE metric_name = 'MEMORY');
 
-INSERT INTO metric_definitions (metric_name, display_name, description, collection_command, collection_interval, processing_rule, unit, enabled, created_at, updated_at)
-SELECT 'PORT_8088', 'Port 8088 Status', 'Check if port 8088 is listening', 'netstat -tuln | grep :8088 > /dev/null && echo 1 || echo 0', 30, NULL, '', TRUE, CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT), CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)
+INSERT INTO metric_definitions (metric_name, display_name, description, metric_type, collection_command, collection_interval, processing_rule, unit, enabled, created_at, updated_at)
+SELECT 'PORT_8088', 'Port 8088 Status', 'Check if port 8088 is listening', 'BOOLEAN', 'netstat -tuln | grep :8088 > /dev/null && echo 1 || echo 0', 30, NULL, '', TRUE, CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT), CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)
 WHERE NOT EXISTS (SELECT 1 FROM metric_definitions WHERE metric_name = 'PORT_8088');
 
--- Insert alert rule for port 8088 monitoring
-INSERT INTO alert_rules (name, agent_id, metric_type, condition, threshold, severity, enabled)
-SELECT 'Port 8088 Down Alert', NULL, 'PORT_8088', 'LT', 1, 'HIGH', TRUE
+-- Insert alert rule for port 8088 monitoring (boolean type)
+INSERT INTO alert_rules (name, agent_id, metric_type, condition, threshold, threshold_text, severity, enabled)
+SELECT 'Port 8088 Down Alert', NULL, 'PORT_8088', 'EQUALS', NULL, 'false', 'HIGH', TRUE
 WHERE NOT EXISTS (SELECT 1 FROM alert_rules WHERE name = 'Port 8088 Down Alert');

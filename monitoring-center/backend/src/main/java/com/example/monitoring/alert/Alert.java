@@ -24,8 +24,12 @@ public class Alert {
     
     private String ruleName;
     private String metricType;
-    private double triggerValue;
-    private double threshold;
+    private Double triggerValue; // For numeric metrics
+    @Column(name = "trigger_value_text")
+    private String triggerValueText; // For string metrics
+    private Double threshold; // For numeric rules
+    @Column(name = "threshold_text")
+    private String thresholdText; // For boolean/string rules
     private String severity;
     private String status; // ACTIVE, ACKNOWLEDGED, RESOLVED
     private long firstTriggeredAt;
@@ -36,6 +40,7 @@ public class Alert {
     private String resolveNote;
     private Long resolvedAt;
     
+    // Constructor for numeric alerts
     public Alert(Long alertRuleId, String agentId, String ruleName, String metricType, 
                  double triggerValue, double threshold, String severity) {
         this.alertRuleId = alertRuleId;
@@ -43,7 +48,27 @@ public class Alert {
         this.ruleName = ruleName;
         this.metricType = metricType;
         this.triggerValue = triggerValue;
+        this.triggerValueText = null;
         this.threshold = threshold;
+        this.thresholdText = null;
+        this.severity = severity;
+        this.status = "ACTIVE";
+        this.firstTriggeredAt = System.currentTimeMillis();
+        this.lastTriggeredAt = System.currentTimeMillis();
+        this.triggerCount = 1;
+    }
+    
+    // Constructor for boolean/string alerts
+    public Alert(Long alertRuleId, String agentId, String ruleName, String metricType,
+                 String triggerValueText, String thresholdText, String severity) {
+        this.alertRuleId = alertRuleId;
+        this.agentId = agentId;
+        this.ruleName = ruleName;
+        this.metricType = metricType;
+        this.triggerValue = null;
+        this.triggerValueText = triggerValueText;
+        this.threshold = null;
+        this.thresholdText = thresholdText;
         this.severity = severity;
         this.status = "ACTIVE";
         this.firstTriggeredAt = System.currentTimeMillis();

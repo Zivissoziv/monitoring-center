@@ -20,8 +20,10 @@ public class AlertRule {
     @Column(name = "agent_id")
     private String agentId; // null means applies to all agents
     private String metricType; // CPU, MEMORY, etc.
-    private String condition; // GT, LT, EQ (greater than, less than, equal)
-    private double threshold;
+    private String condition; // GT, LT, EQ, GTE, LTE (for numeric), EQUALS, NOT_EQUALS (for boolean/string), CONTAINS (for string)
+    private Double threshold; // For numeric comparisons
+    @Column(name = "threshold_text")
+    private String thresholdText; // For boolean/string comparisons
     private String severity; // LOW, MEDIUM, HIGH, CRITICAL
     private boolean enabled;
     
@@ -30,6 +32,17 @@ public class AlertRule {
         this.metricType = metricType;
         this.condition = condition;
         this.threshold = threshold;
+        this.thresholdText = null;
+        this.severity = severity;
+        this.enabled = true;
+    }
+    
+    public AlertRule(String name, String metricType, String condition, String thresholdText, String severity) {
+        this.name = name;
+        this.metricType = metricType;
+        this.condition = condition;
+        this.threshold = null;
+        this.thresholdText = thresholdText;
         this.severity = severity;
         this.enabled = true;
     }

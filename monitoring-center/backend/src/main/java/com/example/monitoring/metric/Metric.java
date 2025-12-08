@@ -28,12 +28,24 @@ public class Metric {
     @Column(name = "metric_value")
     private double value;
     
+    @Column(name = "text_value")
+    private String textValue; // For string-type metrics
+    
     private long timestamp;
     
     public Metric(String agentId, String metricType, double value) {
         this.agentId = agentId;
         this.metricType = metricType;
         this.value = value;
+        this.textValue = null;
+        this.timestamp = System.currentTimeMillis();
+    }
+    
+    public Metric(String agentId, String metricType, String textValue) {
+        this.agentId = agentId;
+        this.metricType = metricType;
+        this.value = 0.0;
+        this.textValue = textValue;
         this.timestamp = System.currentTimeMillis();
     }
 }

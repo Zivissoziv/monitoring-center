@@ -5,6 +5,8 @@ import com.example.monitoring.alert.AlertRepository;
 import com.example.monitoring.alert.AlertRule;
 import com.example.monitoring.alert.AlertRuleRepository;
 import com.example.monitoring.metric.Metric;
+import com.example.monitoring.metric.MetricDefinition;
+import com.example.monitoring.metric.MetricDefinitionRepository;
 import com.example.monitoring.metric.MetricRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.quartz.Job;
@@ -14,6 +16,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Job for checking alert conditions
@@ -31,6 +34,9 @@ public class AlertCheckJob implements Job {
     
     @Autowired
     private AlertRepository alertRepository;
+    
+    @Autowired
+    private MetricDefinitionRepository metricDefinitionRepository;
     
     @Override
     public void execute(JobExecutionContext context) throws JobExecutionException {
@@ -61,6 +67,10 @@ public class AlertCheckJob implements Job {
     }
     
     private void checkAlertRule(AlertRule rule, long startTime, long endTime) {
+        // Get metric definition to determine metric type
+        Optional<MetricDefinition> metricDefOpt = metricDefinitionRepository.findByMetricName(rule.getMetricType());
+        String metricType = metricDefOpt.map(MetricDefinition::getMetricType).orElse("NUMERIC");
+        
         // Get recent metrics for this rule
         List<Metric> metrics;
         
@@ -79,22 +89,7 @@ public class AlertCheckJob implements Job {
         
         // Check each metric against the rule
         for (Metric metric : metrics) {
-            boolean triggered = false;
-            
-            switch (rule.getCondition()) {
-                case "GT":
-                case ">":
-                    triggered = metric.getValue() > rule.getThreshold();
-                    break;
-                case "LT":
-                case "<":
-                    triggered = metric.getValue() < rule.getThreshold();
-                    break;
-                case "EQ":
-                case "=":
-                    triggered = Math.abs(metric.getValue() - rule.getThreshold()) < 0.001;
-                    break;
-            }
+            boolean triggered = evaluateCondition(metric, rule, metricType);
             
             if (triggered) {
                 handleTriggeredAlert(rule, metric);
@@ -106,7 +101,123 @@ public class AlertCheckJob implements Job {
         autoResolveAlertsForRule(rule, triggeredAgents, metrics);
     }
     
+    /**
+     * Evaluate alert condition based on metric type
+     */
+    private boolean evaluateCondition(Metric metric, AlertRule rule, String metricType) {
+        switch (metricType) {
+            case "NUMERIC":
+                return evaluateNumericCondition(metric.getValue(), rule);
+            case "BOOLEAN":
+                return evaluateBooleanCondition(metric.getValue(), rule);
+            case "STRING":
+                return evaluateStringCondition(metric.getTextValue(), rule);
+            default:
+                log.warn("Unknown metric type: {}, defaulting to NUMERIC", metricType);
+                return evaluateNumericCondition(metric.getValue(), rule);
+        }
+    }
+    
+    /**
+     * Evaluate numeric condition (GT, LT, EQ, GTE, LTE)
+     */
+    private boolean evaluateNumericCondition(double value, AlertRule rule) {
+        if (rule.getThreshold() == null) {
+            log.warn("Numeric rule {} has no threshold", rule.getId());
+            return false;
+        }
+        
+        double threshold = rule.getThreshold();
+        switch (rule.getCondition()) {
+            case "GT":
+            case ">":
+                return value > threshold;
+            case "LT":
+            case "<":
+                return value < threshold;
+            case "GTE":
+            case ">=":
+                return value >= threshold;
+            case "LTE":
+            case "<=":
+                return value <= threshold;
+            case "EQ":
+            case "=":
+            case "EQUALS":
+                return Math.abs(value - threshold) < 0.001;
+            case "NOT_EQUALS":
+            case "!=":
+                return Math.abs(value - threshold) >= 0.001;
+            default:
+                log.warn("Unknown numeric condition: {}", rule.getCondition());
+                return false;
+        }
+    }
+    
+    /**
+     * Evaluate boolean condition (EQUALS, NOT_EQUALS)
+     */
+    private boolean evaluateBooleanCondition(double value, AlertRule rule) {
+        if (rule.getThresholdText() == null) {
+            log.warn("Boolean rule {} has no threshold text", rule.getId());
+            return false;
+        }
+        
+        boolean metricBool = value > 0.5; // 0 = false, 1 = true
+        boolean expectedBool = "true".equalsIgnoreCase(rule.getThresholdText()) || "1".equals(rule.getThresholdText());
+        
+        switch (rule.getCondition()) {
+            case "EQUALS":
+            case "=":
+            case "EQ":
+                return metricBool == expectedBool;
+            case "NOT_EQUALS":
+            case "!=":
+                return metricBool != expectedBool;
+            default:
+                log.warn("Unknown boolean condition: {}", rule.getCondition());
+                return false;
+        }
+    }
+    
+    /**
+     * Evaluate string condition (EQUALS, NOT_EQUALS, CONTAINS)
+     */
+    private boolean evaluateStringCondition(String value, AlertRule rule) {
+        if (rule.getThresholdText() == null) {
+            log.warn("String rule {} has no threshold text", rule.getId());
+            return false;
+        }
+        
+        if (value == null) {
+            value = "";
+        }
+        
+        String expected = rule.getThresholdText();
+        
+        switch (rule.getCondition()) {
+            case "EQUALS":
+            case "=":
+            case "EQ":
+                return value.equals(expected);
+            case "NOT_EQUALS":
+            case "!=":
+                return !value.equals(expected);
+            case "CONTAINS":
+                return value.contains(expected);
+            case "NOT_CONTAINS":
+                return !value.contains(expected);
+            default:
+                log.warn("Unknown string condition: {}", rule.getCondition());
+                return false;
+        }
+    }
+    
     private void handleTriggeredAlert(AlertRule rule, Metric metric) {
+        // Get metric definition to determine type
+        Optional<MetricDefinition> metricDefOpt = metricDefinitionRepository.findByMetricName(metric.getMetricType());
+        String metricType = metricDefOpt.map(MetricDefinition::getMetricType).orElse("NUMERIC");
+        
         // Only look for ACTIVE or ACKNOWLEDGED alerts (not RESOLVED)
         Alert existingAlert = alertRepository.findByAlertRuleIdAndAgentIdAndStatusIn(
                 rule.getId(), 
@@ -115,10 +226,16 @@ public class AlertCheckJob implements Job {
         ).orElse(null);
         
         if (existingAlert != null) {
-            // Update existing active or acknowledged alert
+            // Update existing active or acknowledged alert based on metric type
+            if ("NUMERIC".equals(metricType)) {
+                existingAlert.setTriggerValue(metric.getValue());
+            } else if ("STRING".equals(metricType)) {
+                existingAlert.setTriggerValueText(metric.getTextValue());
+            } else if ("BOOLEAN".equals(metricType)) {
+                existingAlert.setTriggerValue(metric.getValue());
+            }
             existingAlert.setLastTriggeredAt(System.currentTimeMillis());
             existingAlert.setTriggerCount(existingAlert.getTriggerCount() + 1);
-            existingAlert.setTriggerValue(metric.getValue());
             alertRepository.save(existingAlert);
             
             log.debug("Updated existing {} alert for rule {} on agent {}", 
@@ -126,20 +243,37 @@ public class AlertCheckJob implements Job {
         } else {
             // No active/acknowledged alert exists, create a new one
             // This includes the case where a previous alert was RESOLVED
-            Alert newAlert = new Alert(
-                    rule.getId(),
-                    metric.getAgentId(),
-                    rule.getName(),
-                    rule.getMetricType(),
-                    metric.getValue(),
-                    rule.getThreshold(),
-                    rule.getSeverity()
-            );
+            Alert newAlert;
+            if ("NUMERIC".equals(metricType)) {
+                newAlert = new Alert(
+                        rule.getId(),
+                        metric.getAgentId(),
+                        rule.getName(),
+                        rule.getMetricType(),
+                        metric.getValue(),
+                        rule.getThreshold() != null ? rule.getThreshold() : 0.0,
+                        rule.getSeverity()
+                );
+            } else {
+                // Boolean or String type
+                String triggerText = "STRING".equals(metricType) ? 
+                        metric.getTextValue() : 
+                        (metric.getValue() > 0.5 ? "true" : "false");
+                newAlert = new Alert(
+                        rule.getId(),
+                        metric.getAgentId(),
+                        rule.getName(),
+                        rule.getMetricType(),
+                        triggerText,
+                        rule.getThresholdText() != null ? rule.getThresholdText() : "",
+                        rule.getSeverity()
+                );
+            }
             alertRepository.save(newAlert);
             
-            log.info("Created new alert for rule {} on agent {}: {} {} {}", 
+            log.info("Created new alert for rule {} on agent {}: metricType={}, condition={}, threshold={}/{}", 
                     rule.getId(), metric.getAgentId(), 
-                    metric.getValue(), rule.getCondition(), rule.getThreshold());
+                    metricType, rule.getCondition(), rule.getThreshold(), rule.getThresholdText());
         }
     }
     

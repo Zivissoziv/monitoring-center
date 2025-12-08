@@ -26,6 +26,9 @@ public class MetricDefinition {
     @Column(length = 2000)
     private String description; // Description of the metric
     
+    @Column(name = "metric_type")
+    private String metricType = "NUMERIC"; // NUMERIC, BOOLEAN, STRING
+    
     @Column(name = "collection_command", length = 2000, nullable = false)
     private String collectionCommand; // Shell command to collect metric
     
