@@ -23,7 +23,7 @@ public class MetricService {
     private AlertService alertService;
     
     public List<Metric> getAllMetrics() {
-        return metricRepository.findAll();
+        return metricRepository.findAllByOrderByTimestampDesc(org.springframework.data.domain.Pageable.unpaged()).getContent();
     }
     
     // Add paginated method

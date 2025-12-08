@@ -3,17 +3,37 @@
    
     
     <!-- Summary Cards -->
-    <el-row :gutter="20" class="dashboard-summary">
-      <el-col :span="6">
-        <el-card shadow="hover" class="summary-card">
-          <el-statistic title="当前告警" :value="activeAlertsCount">
-            <template #prefix>
-              <el-icon color="#f56c6c"><Bell /></el-icon>
-            </template>
-          </el-statistic>
-        </el-card>
-      </el-col>
-    </el-row>
+    <el-card shadow="hover" class="summary-cards-container">
+      <el-row :gutter="20">
+        <el-col :span="8">
+          <div class="summary-card-item">
+            <el-statistic title="活跃告警" :value="activeAlertsCount">
+              <template #prefix>
+                <el-icon color="#f56c6c"><Bell /></el-icon>
+              </template>
+            </el-statistic>
+          </div>
+        </el-col>
+        <el-col :span="8">
+          <div class="summary-card-item">
+            <el-statistic title="已关闭告警" :value="resolvedAlertsCount">
+              <template #prefix>
+                <el-icon color="#67c23a"><CircleCheck /></el-icon>
+              </template>
+            </el-statistic>
+          </div>
+        </el-col>
+        <el-col :span="8">
+          <div class="summary-card-item">
+            <el-statistic title="总告警数" :value="totalAlertsCount">
+              <template #prefix>
+                <el-icon color="#909399"><List /></el-icon>
+              </template>
+            </el-statistic>
+          </div>
+        </el-col>
+      </el-row>
+    </el-card>
     
     <!-- Alert Filters -->
     <el-card shadow="hover" class="filter-card">
@@ -23,6 +43,15 @@
         </div>
       </template>
       <el-form :inline="true" label-width="100px">
+        <el-form-item label="状态">
+          <el-select v-model="alertFilters.status" @change="filterAlerts" placeholder="全部" style="width: 150px">
+            <el-option label="全部" value="" />
+            <el-option label="打开" value="ACTIVE" />
+            <el-option label="已确认" value="ACKNOWLEDGED" />
+            <el-option label="已关闭" value="RESOLVED" />
+          </el-select>
+        </el-form-item>
+        
         <el-form-item label="指标类型">
           <el-select v-model="alertFilters.metricType" @change="filterAlerts" placeholder="全部" style="width: 150px">
             <el-option label="全部" value="" />
@@ -51,7 +80,10 @@
     <el-card shadow="hover" class="alerts-table">
       <template #header>
         <div class="card-header">
-          <span>当前告警</span>
+          <span>告警列表</span>
+          <el-tag v-if="alertFilters.status" type="info" size="small">
+            {{ getStatusText(alertFilters.status) }}
+          </el-tag>
         </div>
       </template>
       <el-table :data="filteredAlerts" stripe style="width: 100%" v-loading="loading">
@@ -81,16 +113,31 @@
             </el-tag>
           </template>
         </el-table-column>
+        <el-table-column label="状态" width="100">
+          <template #default="scope">
+            <el-tag :type="getStatusType(scope.row.status)" size="small">
+              {{ getStatusText(scope.row.status) }}
+            </el-tag>
+          </template>
+        </el-table-column>
         <el-table-column label="最后触发" min-width="180">
           <template #default="scope">
             {{ formatTime(scope.row.lastTriggeredAt) }}
           </template>
         </el-table-column>
         <el-table-column prop="triggerCount" label="触发次数" width="100" />
-        <el-table-column label="操作" width="150">
+        <el-table-column label="操作" width="200">
           <template #default="scope">
             <el-button type="primary" size="small" @click="openEmergencyDrawer(scope.row)">
               应急处理
+            </el-button>
+            <el-button 
+              v-if="scope.row.status === 'ACTIVE' || scope.row.status === 'ACKNOWLEDGED'"
+              type="success" 
+              size="small" 
+              @click="closeAlert(scope.row.id)"
+            >
+              关闭
             </el-button>
           </template>
         </el-table-column>
@@ -227,27 +274,6 @@
             <el-alert type="warning" :closable="false" style="margin-bottom: 15px;">
               暂无该告警规则的应急知识库，请在应急知识库页面配置。以下为默认应急流程：
             </el-alert>
-            <el-steps direction="vertical" :active="7">
-              <el-step title="确认告警" description="检查当前告警详情，确认告警的真实性和严重程度" />
-              <el-step title="定位问题" description="根据告警类型和代理IP，登录对应服务器进行问题排查" />
-              <el-step title="临时处理">
-                <template #description>
-                  <div v-if="selectedAlert && selectedAlert.metricType === 'CPU'">
-                    <strong>CPU告警</strong>: 检查高CPU进程，必要时重启相关服务
-                  </div>
-                  <div v-else-if="selectedAlert && selectedAlert.metricType === 'MEMORY'">
-                    <strong>内存告警</strong>: 检查内存使用情况，清理缓存或重启应用
-                  </div>
-                  <div v-else>
-                    <strong>通用处理</strong>: 检查系统资源使用情况，查看应用日志，必要时重启服务
-                  </div>
-                </template>
-              </el-step>
-              <el-step title="根因分析" description="分析系统日志，找出问题根本原因" />
-              <el-step title="永久解决" description="根据根因分析结果，实施永久性解决方案" />
-              <el-step title="验证恢复" description="确认系统恢复正常，监控指标回到正常范围" />
-              <el-step title="记录总结" description="记录问题处理过程和解决方案，更新知识库" />
-            </el-steps>
           </div>
         </el-card>
         
@@ -388,7 +414,7 @@
 </template>
 
 <script>
-import { DataBoard, Bell, ArrowDown, ArrowRight } from '@element-plus/icons-vue'
+import { DataBoard, Bell, ArrowDown, ArrowRight, CircleCheck, List } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { Chart } from 'chart.js/auto'
 import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
@@ -399,7 +425,9 @@ export default {
     DataBoard,
     Bell,
     ArrowDown,
-    ArrowRight
+    ArrowRight,
+    CircleCheck,
+    List
   },
   setup() {
     const alerts = ref([])
@@ -409,7 +437,8 @@ export default {
     const alertFilters = ref({
       agentIp: '',
       severity: '',
-      metricType: ''
+      metricType: '',
+      status: 'ACTIVE' // Default to show ACTIVE alerts
     })
     const isEmergencyDrawerOpen = ref(false)
     const selectedAlert = ref(null)
@@ -436,12 +465,25 @@ export default {
     
     // Computed properties
     const activeAlertsCount = computed(() => {
-      return filteredAlerts.value.length
+      return alerts.value.filter(alert => alert.status === 'ACTIVE').length
+    })
+    
+    const resolvedAlertsCount = computed(() => {
+      return alerts.value.filter(alert => alert.status === 'RESOLVED').length
+    })
+    
+    const totalAlertsCount = computed(() => {
+      return alerts.value.length
     })
     
     const filteredAlerts = computed(() => {
       // Apply all filters
-      let filtered = alerts.value.filter(alert => alert.status === 'ACTIVE')
+      let filtered = alerts.value
+      
+      // Filter by status
+      if (alertFilters.value.status) {
+        filtered = filtered.filter(alert => alert.status === alertFilters.value.status)
+      }
       
       // Filter by metric type
       if (alertFilters.value.metricType) {
@@ -569,8 +611,8 @@ export default {
     const loadData = async () => {
       loading.value = true
       try {
-        // Load active alerts only
-        const alertsResponse = await fetch('/api/alerts/active')
+        // Load all alerts (filtering will be done in the frontend)
+        const alertsResponse = await fetch('/api/alerts')
         alerts.value = await alertsResponse.json()
         
         // Load agents to get IP addresses
@@ -836,6 +878,24 @@ export default {
       return typeMap[severity] || 'info'
     }
     
+    const getStatusText = (status) => {
+      const statusMap = {
+        'ACTIVE': '打开',
+        'ACKNOWLEDGED': '已确认',
+        'RESOLVED': '已关闭'
+      }
+      return statusMap[status] || status
+    }
+    
+    const getStatusType = (status) => {
+      const typeMap = {
+        'ACTIVE': 'danger',
+        'ACKNOWLEDGED': 'warning',
+        'RESOLVED': 'success'
+      }
+      return typeMap[status] || 'info'
+    }
+    
     const formatValue = (value) => {
       return value.toFixed(2) + '%'
     }
@@ -1027,6 +1087,29 @@ export default {
       delete stepResultTab.value[index]
     }
     
+    const closeAlert = async (alertId) => {
+      try {
+        const response = await fetch(`/api/alerts/${alertId}/resolve`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ resolveNote: '用户手动关闭' })
+        })
+        
+        if (response.ok) {
+          ElMessage.success('告警已关闭')
+          // Reload alerts to update the list
+          await loadData()
+        } else {
+          ElMessage.error('关闭告警失败')
+        }
+      } catch (error) {
+        console.error('Error closing alert:', error)
+        ElMessage.error('关闭告警失败')
+      }
+    }
+    
     return {
       // Reactive data
       alerts,
@@ -1053,12 +1136,16 @@ export default {
       
       // Computed properties
       activeAlertsCount,
+      resolvedAlertsCount,
+      totalAlertsCount,
       filteredAlerts,
       paginatedMetrics,
       
       // Methods
       getAgentIp,
       getSeverityType,
+      getStatusText,
+      getStatusType,
       loading,
       getMetricTypeName,
       getSeverityText,
@@ -1080,7 +1167,8 @@ export default {
       findStepNumber, // Add findStepNumber to returned values
       executeStepCommand, // Add executeStepCommand to returned values
       copyCommand, // Add copyCommand to returned values
-      clearStepResult // Add clearStepResult to returned values
+      clearStepResult, // Add clearStepResult to returned values
+      closeAlert // Add closeAlert to returned values
     }
   }
 }
@@ -1104,8 +1192,13 @@ export default {
   margin-bottom: 24px;
 }
 
-.dashboard-summary {
+.summary-cards-container {
   margin-bottom: 20px;
+}
+
+.summary-card-item {
+  text-align: center;
+  padding: 10px 0;
 }
 
 .filter-card,

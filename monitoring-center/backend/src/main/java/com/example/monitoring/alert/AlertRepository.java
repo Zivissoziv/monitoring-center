@@ -18,4 +18,7 @@ public interface AlertRepository extends JpaRepository<Alert, Long> {
     List<Alert> findByAgentId(String agentId);
     
     List<Alert> findBySeverity(String severity);
+    
+    // Find all active and acknowledged alerts that need to be checked for auto-closure
+    List<Alert> findByStatusIn(List<String> statuses);
 }

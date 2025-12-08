@@ -113,9 +113,18 @@ CREATE INDEX IF NOT EXISTS idx_agent_metric_configs_metric ON agent_metric_confi
 
 -- Insert default metric definitions
 INSERT INTO metric_definitions (metric_name, display_name, description, collection_command, collection_interval, processing_rule, unit, enabled, created_at, updated_at)
-SELECT 'CPU', 'CPU Usage', 'CPU usage percentage', 'top -bn1 | awk ''/Cpu/{print 100-$8}''', 30, NULL, '%', TRUE, CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT), CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)
+SELECT 'CPU', 'CPU Usage', 'CPU usage percentage', 'top -bn1 | awk ''/Cpu/{print 100-$8}''', 60, NULL, '%', TRUE, CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT), CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)
 WHERE NOT EXISTS (SELECT 1 FROM metric_definitions WHERE metric_name = 'CPU');
 
 INSERT INTO metric_definitions (metric_name, display_name, description, collection_command, collection_interval, processing_rule, unit, enabled, created_at, updated_at)
-SELECT 'MEMORY', 'Memory Usage', 'Memory usage percentage', 'free | awk ''/Mem/{printf "%.2f", $3/$2*100}''', 30, NULL, '%', TRUE, CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT), CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)
+SELECT 'MEMORY', 'Memory Usage', 'Memory usage percentage', 'free | awk ''/Mem/{printf "%.2f", $3/$2*100}''', 60, NULL, '%', TRUE, CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT), CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)
 WHERE NOT EXISTS (SELECT 1 FROM metric_definitions WHERE metric_name = 'MEMORY');
+
+INSERT INTO metric_definitions (metric_name, display_name, description, collection_command, collection_interval, processing_rule, unit, enabled, created_at, updated_at)
+SELECT 'PORT_8088', 'Port 8088 Status', 'Check if port 8088 is listening', 'netstat -tuln | grep :8088 > /dev/null && echo 1 || echo 0', 30, NULL, '', TRUE, CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT), CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)
+WHERE NOT EXISTS (SELECT 1 FROM metric_definitions WHERE metric_name = 'PORT_8088');
+
+-- Insert alert rule for port 8088 monitoring
+INSERT INTO alert_rules (name, agent_id, metric_type, condition, threshold, severity, enabled)
+SELECT 'Port 8088 Down Alert', NULL, 'PORT_8088', 'LT', 1, 'HIGH', TRUE
+WHERE NOT EXISTS (SELECT 1 FROM alert_rules WHERE name = 'Port 8088 Down Alert');

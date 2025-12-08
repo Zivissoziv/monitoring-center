@@ -2,12 +2,14 @@ package com.example.monitoring.alert;
 
 import com.example.monitoring.metric.Metric;
 import com.example.monitoring.metric.MetricRepository;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Optional;
 
+@Slf4j
 @Service
 public class AlertService {
 
@@ -91,25 +93,38 @@ public class AlertService {
 
     /**
      * Record alert or update existing one (merge alerts for same rule and agent)
+     * Note: If existing alert is RESOLVED, create a new alert instead of reactivating
      */
     private void recordAlert(AlertRule rule, Metric metric) {
         Optional<Alert> existingAlert = alertRepository.findByAlertRuleIdAndAgentId(
                 rule.getId(), metric.getAgentId());
 
         if (existingAlert.isPresent()) {
-            // Update existing alert
             Alert alert = existingAlert.get();
-            alert.setTriggerValue(metric.getValue());
-            alert.setLastTriggeredAt(System.currentTimeMillis());
-            alert.setTriggerCount(alert.getTriggerCount() + 1);
-                    
-            // If alert was resolved, reactivate it
+            
+            // If alert was RESOLVED (closed), create a new alert instead of reactivating
             if ("RESOLVED".equals(alert.getStatus())) {
-                alert.setStatus("ACTIVE");
-                alert.setResolveNote(null);
+                // Delete the UNIQUE constraint entry by removing the old resolved alert
+                alertRepository.delete(alert);
+                
+                // Create new alert
+                Alert newAlert = new Alert(
+                        rule.getId(),
+                        metric.getAgentId(),
+                        rule.getName(),
+                        metric.getMetricType(),
+                        metric.getValue(),
+                        rule.getThreshold(),
+                        rule.getSeverity()
+                );
+                alertRepository.save(newAlert);
+            } else {
+                // Update existing active/acknowledged alert
+                alert.setTriggerValue(metric.getValue());
+                alert.setLastTriggeredAt(System.currentTimeMillis());
+                alert.setTriggerCount(alert.getTriggerCount() + 1);
+                alertRepository.save(alert);
             }
-                    
-            alertRepository.save(alert);
         } else {
             // Create new alert
             Alert alert = new Alert(
