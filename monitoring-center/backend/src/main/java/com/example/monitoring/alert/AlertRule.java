@@ -25,6 +25,8 @@ public class AlertRule {
     @Column(name = "threshold_text")
     private String thresholdText; // For boolean/string comparisons
     private String severity; // LOW, MEDIUM, HIGH, CRITICAL
+    @Column(name = "alert_message", length = 1000)
+    private String alertMessage; // Custom alert message to display when triggered
     private boolean enabled;
     
     public AlertRule(String name, String metricType, String condition, double threshold, String severity) {

@@ -27,6 +27,7 @@ CREATE TABLE IF NOT EXISTS alert_rules (
     threshold DOUBLE,
     threshold_text VARCHAR(500),
     severity VARCHAR(50) NOT NULL,
+    alert_message VARCHAR(1000),
     enabled BOOLEAN DEFAULT TRUE
 );
 
@@ -42,6 +43,7 @@ CREATE TABLE IF NOT EXISTS alerts (
     threshold DOUBLE,
     threshold_text VARCHAR(500),
     severity VARCHAR(50) NOT NULL,
+    alert_message VARCHAR(1000),
     status VARCHAR(50) DEFAULT 'ACTIVE',
     first_triggered_at BIGINT NOT NULL,
     last_triggered_at BIGINT NOT NULL,
@@ -130,6 +132,6 @@ SELECT 'PORT_8088', 'Port 8088 Status', 'Check if port 8088 is listening', 'BOOL
 WHERE NOT EXISTS (SELECT 1 FROM metric_definitions WHERE metric_name = 'PORT_8088');
 
 -- Insert alert rule for port 8088 monitoring (boolean type)
-INSERT INTO alert_rules (name, agent_id, metric_type, condition, threshold, threshold_text, severity, enabled)
-SELECT 'Port 8088 Down Alert', NULL, 'PORT_8088', 'EQUALS', NULL, 'false', 'HIGH', TRUE
+INSERT INTO alert_rules (name, agent_id, metric_type, condition, threshold, threshold_text, severity, alert_message, enabled)
+SELECT 'Port 8088 Down Alert', NULL, 'PORT_8088', 'EQUALS', NULL, 'false', 'HIGH', NULL, TRUE
 WHERE NOT EXISTS (SELECT 1 FROM alert_rules WHERE name = 'Port 8088 Down Alert');

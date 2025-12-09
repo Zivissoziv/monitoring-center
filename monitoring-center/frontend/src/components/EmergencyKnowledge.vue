@@ -1,6 +1,29 @@
 <template>
   <div class="emergency-knowledge">
     
+    <!-- Search and Filter Bar -->
+    <el-card shadow="hover" style="margin-bottom: 20px;">
+      <el-form :inline="true" :model="searchForm">
+        <el-form-item label="标题">
+          <el-input v-model="searchForm.title" placeholder="知识库标题" clearable style="width: 200px" />
+        </el-form-item>
+        <el-form-item label="关联规则">
+          <el-select v-model="searchForm.alertRuleId" placeholder="全部" clearable style="width: 250px">
+            <el-option 
+              v-for="rule in alertRules" 
+              :key="rule.id" 
+              :label="rule.name" 
+              :value="rule.id"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item>
+          <el-button type="primary" @click="handleSearch" :icon="Search">查询</el-button>
+          <el-button @click="handleReset" :icon="RefreshIcon">重置</el-button>
+        </el-form-item>
+      </el-form>
+    </el-card>
+    
     <!-- Knowledge List -->
     <el-card shadow="hover">
       <template #header>
@@ -10,7 +33,7 @@
         </div>
       </template>
       
-      <el-table :data="knowledgeList" stripe style="width: 100%" v-loading="loading">
+      <el-table :data="paginatedKnowledgeList" stripe style="width: 100%" v-loading="loading">
         <el-table-column prop="id" label="ID" width="80" />
         <el-table-column prop="title" label="标题" min-width="200" />
         <el-table-column label="关联告警规则" min-width="180">
@@ -55,6 +78,19 @@
           <el-empty description="暂无知识库数据" />
         </template>
       </el-table>
+      
+      <!-- Pagination -->
+      <div class="pagination-container">
+        <el-pagination
+          v-model:current-page="pagination.currentPage"
+          v-model:page-size="pagination.pageSize"
+          :page-sizes="[10, 20, 50, 100]"
+          :total="filteredTotal"
+          layout="total, sizes, prev, pager, next, jumper"
+          @size-change="handleSizeChange"
+          @current-change="handleCurrentChange"
+        />
+      </div>
     </el-card>
     
     <!-- Create/Edit Dialog -->
@@ -222,7 +258,7 @@
 </template>
 
 <script>
-import { Reading, Plus, Edit, View, Delete, List, Top, Bottom } from '@element-plus/icons-vue'
+import { Reading, Plus, Edit, View, Delete, List, Top, Bottom, Search, Refresh } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
 export default {
@@ -235,7 +271,9 @@ export default {
     Delete,
     List,
     Top,
-    Bottom
+    Bottom,
+    Search,
+    RefreshIcon: Refresh
   },
   data() {
     return {
@@ -243,6 +281,14 @@ export default {
       alertRules: [],
       agents: [],
       loading: false,
+      searchForm: {
+        title: '',
+        alertRuleId: ''
+      },
+      pagination: {
+        currentPage: 1,
+        pageSize: 10
+      },
       showDialog: false,
       showViewDialog: false,
       isEditMode: false,
@@ -257,6 +303,31 @@ export default {
     }
   },
   computed: {
+    filteredKnowledgeList() {
+      let filtered = this.knowledgeList
+      
+      if (this.searchForm.title) {
+        filtered = filtered.filter(item => 
+          item.title.toLowerCase().includes(this.searchForm.title.toLowerCase())
+        )
+      }
+      
+      if (this.searchForm.alertRuleId) {
+        filtered = filtered.filter(item => 
+          item.alertRuleId === this.searchForm.alertRuleId
+        )
+      }
+      
+      return filtered
+    },
+    filteredTotal() {
+      return this.filteredKnowledgeList.length
+    },
+    paginatedKnowledgeList() {
+      const start = (this.pagination.currentPage - 1) * this.pagination.pageSize
+      const end = start + this.pagination.pageSize
+      return this.filteredKnowledgeList.slice(start, end)
+    },
     availableAlertRules() {
       // Filter out alert rules that already have knowledge base
       const usedRuleIds = this.knowledgeList
@@ -289,6 +360,27 @@ export default {
       } finally {
         this.loading = false
       }
+    },
+    
+    handleSearch() {
+      this.pagination.currentPage = 1
+    },
+    
+    handleReset() {
+      this.searchForm = {
+        title: '',
+        alertRuleId: ''
+      }
+      this.pagination.currentPage = 1
+    },
+    
+    handleSizeChange(val) {
+      this.pagination.pageSize = val
+      this.pagination.currentPage = 1
+    },
+    
+    handleCurrentChange(val) {
+      this.pagination.currentPage = val
     },
     
     getAlertRuleName(alertRuleId) {
@@ -596,5 +688,11 @@ export default {
   white-space: pre-wrap;
   word-break: break-all;
   line-height: 1.5;
+}
+
+.pagination-container {
+  margin-top: 20px;
+  display: flex;
+  justify-content: flex-end;
 }
 </style>

@@ -31,6 +31,8 @@ public class Alert {
     @Column(name = "threshold_text")
     private String thresholdText; // For boolean/string rules
     private String severity;
+    @Column(name = "alert_message", length = 1000)
+    private String alertMessage; // Custom message from alert rule
     private String status; // ACTIVE, ACKNOWLEDGED, RESOLVED
     private long firstTriggeredAt;
     private long lastTriggeredAt;

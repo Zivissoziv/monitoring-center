@@ -51,6 +51,7 @@ public class AlertService {
         alertRule.setThreshold(alertRuleDetails.getThreshold());
         alertRule.setThresholdText(alertRuleDetails.getThresholdText());
         alertRule.setSeverity(alertRuleDetails.getSeverity());
+        alertRule.setAlertMessage(alertRuleDetails.getAlertMessage());
         alertRule.setEnabled(alertRuleDetails.isEnabled());
 
         return alertRuleRepository.save(alertRule);
@@ -245,6 +246,7 @@ public class AlertService {
                         rule.getThreshold() != null ? rule.getThreshold() : 0.0,
                         rule.getSeverity()
                 );
+                alert.setAlertMessage(rule.getAlertMessage());
             } else {
                 // Boolean or String type
                 String triggerText = "STRING".equals(metricType) ? 
@@ -259,6 +261,7 @@ public class AlertService {
                         rule.getThresholdText() != null ? rule.getThresholdText() : "",
                         rule.getSeverity()
                 );
+                alert.setAlertMessage(rule.getAlertMessage());
             }
             alertRepository.save(alert);
         }

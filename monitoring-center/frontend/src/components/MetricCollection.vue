@@ -1,60 +1,51 @@
 <template>
   <div class="metric-collection">
     
-    
-    <!-- Filter and View Controls -->
-    <el-card class="control-panel" shadow="hover">
-      <el-form :inline="true" label-width="90px">
+    <!-- Search and Filter Bar -->
+    <el-card shadow="hover" style="margin-bottom: 20px;">
+      <el-form :inline="true" :model="searchForm">
         <el-form-item label="指标类型">
-          <el-select v-model="selectedMetricType" @change="filterMetrics" placeholder="选择指标类型" style="width: 150px">
-            <el-option label="全部指标" value="ALL" />
-            <el-option v-for="definition in metricDefinitions" :key="definition.metricName" :label="definition.displayName" :value="definition.metricName" />
+          <el-select v-model="searchForm.metricType" placeholder="全部" clearable style="width: 150px">
+            <el-option 
+              v-for="definition in metricDefinitions" 
+              :key="definition.metricName" 
+              :label="definition.displayName" 
+              :value="definition.metricName"
+            />
           </el-select>
         </el-form-item>
         
         <el-form-item label="代理">
-          <el-select v-model="selectedAgent" @change="filterMetrics" placeholder="选择代理" style="width: 200px">
-            <el-option label="全部代理" value="ALL" />
-            <el-option v-for="agent in sortedAgents" :key="agent.id" :label="agent.name" :value="agent.id" />
+          <el-select v-model="searchForm.agentId" placeholder="全部" clearable style="width: 200px">
+            <el-option 
+              v-for="agent in sortedAgents" 
+              :key="agent.id" 
+              :label="agent.name" 
+              :value="agent.id"
+            />
           </el-select>
         </el-form-item>
         
         <el-form-item label="时间范围">
           <el-date-picker
-            v-model="timeRange"
+            v-model="searchForm.timeRange"
             type="datetimerange"
             range-separator="至"
             start-placeholder="开始时间"
             end-placeholder="结束时间"
             format="YYYY-MM-DD HH:mm:ss"
             value-format="x"
-            @change="filterMetrics"
             style="width: 380px"
           />
         </el-form-item>
         
         <el-form-item>
-          <el-button-group>
-            <el-button type="primary" @click="setQuickRange('1h')" size="small">最近1小时</el-button>
-            <el-button type="primary" @click="setQuickRange('24h')" size="small">最近24小时</el-button>
-            <el-button type="primary" @click="setQuickRange('7d')" size="small">最近7天</el-button>
-            <el-button type="info" @click="clearTimeRange" size="small">清除时间</el-button>
-          </el-button-group>
+          <el-button type="primary" @click="handleSearch" :icon="Search">查询</el-button>
+          <el-button @click="handleReset" :icon="Refresh">重置</el-button>
         </el-form-item>
       </el-form>
       
-      <div class="view-toggle">
-        <el-radio-group v-model="viewMode" size="default">
-          <el-radio-button label="table">
-            <el-icon><Grid /></el-icon>
-            <span>表格视图</span>
-          </el-radio-button>
-          <el-radio-button label="chart">
-            <el-icon><TrendCharts /></el-icon>
-            <span>图表视图</span>
-          </el-radio-button>
-        </el-radio-group>
-      </div>
+      
     </el-card>
     
     <!-- Table View -->
@@ -62,6 +53,16 @@
       <template #header>
         <div class="card-header">
           <span>监控数据表格</span>
+          <el-radio-group v-model="viewMode" size="default">
+            <el-radio-button label="table">
+              <el-icon><Grid /></el-icon>
+              <span>表格视图</span>
+            </el-radio-button>
+            <el-radio-button label="chart">
+              <el-icon><TrendCharts /></el-icon>
+              <span>图表视图</span>
+            </el-radio-button>
+          </el-radio-group>
         </div>
       </template>
       <el-table :data="paginatedMetrics" stripe style="width: 100%">
@@ -93,14 +94,15 @@
         </template>
       </el-table>
       
-      <div class="pagination-controls">
+      <div class="pagination-container">
         <el-pagination
-          v-model:current-page="currentPage"
-          v-model:page-size="pageSize"
+          v-model:current-page="pagination.currentPage"
+          v-model:page-size="pagination.pageSize"
+          :page-sizes="[10, 20, 50, 100]"
           :total="totalMetrics"
-          layout="prev, pager, next, jumper, ->, total"
-          background
-          @current-change="handlePageChange"
+          layout="total, sizes, prev, pager, next, jumper"
+          @size-change="handleSizeChange"
+          @current-change="handleCurrentChange"
         />
       </div>
     </el-card>
@@ -110,6 +112,16 @@
       <template #header>
         <div class="card-header">
           <span>监控数据图表</span>
+          <el-radio-group v-model="viewMode" size="default">
+            <el-radio-button label="table">
+              <el-icon><Grid /></el-icon>
+              <span>表格视图</span>
+            </el-radio-button>
+            <el-radio-button label="chart">
+              <el-icon><TrendCharts /></el-icon>
+              <span>图表视图</span>
+            </el-radio-button>
+          </el-radio-group>
         </div>
       </template>
       <div v-if="filteredMetrics.length === 0">
@@ -131,7 +143,7 @@
 </template>
 
 <script>
-import { TrendCharts, Grid } from '@element-plus/icons-vue'
+import { TrendCharts, Grid, Search, Refresh } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { Chart } from 'chart.js/auto'
 
@@ -139,7 +151,9 @@ export default {
   name: 'MetricCollection',
   components: {
     TrendCharts,
-    Grid
+    Grid,
+    Search,
+    Refresh
   },
   data() {
     return {
@@ -148,22 +162,23 @@ export default {
       metricDefinitions: [],
       agents: [],
       loading: false,
-      selectedMetricType: 'ALL',
-      selectedAgent: 'ALL',
-      timeRange: null,
+      searchForm: {
+        metricType: '',
+        agentId: '',
+        timeRange: null
+      },
+      pagination: {
+        currentPage: 1,
+        pageSize: 10
+      },
       viewMode: 'table',
       chartInstances: [],
-      currentPage: 1,
-      pageSize: 10,
       totalMetrics: 0
     }
   },
   computed: {
     sortedAgents() {
-      // Get unique agents from metrics
-      const agentIds = [...new Set(this.metrics.map(m => m.agentId))]
-      const uniqueAgents = this.agents.filter(a => agentIds.includes(a.id))
-      return uniqueAgents.sort((a, b) => a.name.localeCompare(b.name))
+      return this.agents.sort((a, b) => a.name.localeCompare(b.name))
     },
     paginatedMetrics() {
       // This will now be populated from backend pagination
@@ -197,13 +212,17 @@ export default {
         // Group by agent for the selected metric type
         const agentIds = [...new Set(this.filteredMetrics.map(m => m.agentId))]
         agentIds.forEach(agentId => {
-          const agentMetrics = this.filteredMetrics.filter(m => m.agentId === agentId)
+          const agentMetrics = this.filteredMetrics.filter(m => 
+            (!this.searchForm.agentId || m.agentId === this.searchForm.agentId) &&
+            (!this.searchForm.metricType || m.metricType === this.searchForm.metricType)
+          )
           if (agentMetrics.length > 0) {
+            const metricType = this.searchForm.metricType || agentMetrics[0].metricType
             charts.push({
-              type: this.selectedMetricType,
+              type: metricType,
               agentId: agentId,
               data: agentMetrics,
-              title: `${this.getAgentName(agentId)} - ${this.getMetricTypeName(this.selectedMetricType)}趋势`
+              title: `${this.getAgentName(agentId)} - ${this.getMetricTypeName(metricType)}趋势`
             })
           }
         })
@@ -274,43 +293,43 @@ export default {
     async loadPaginatedData() {
       this.loading = true
       try {
-        const page = this.currentPage - 1 // Backend uses 0-based indexing
-        const size = this.pageSize
+        const page = this.pagination.currentPage - 1 // Backend uses 0-based indexing
+        const size = this.pagination.pageSize
         
         let url = ''
-        const hasTimeRange = this.timeRange && this.timeRange.length === 2
+        const hasTimeRange = this.searchForm.timeRange && this.searchForm.timeRange.length === 2
         
         // Build URL based on filters
-        if (this.selectedAgent !== 'ALL') {
+        if (this.searchForm.agentId) {
           // Agent-specific queries
-          if (this.selectedMetricType !== 'ALL') {
+          if (this.searchForm.metricType) {
             // Agent + MetricType + optional TimeRange
             if (hasTimeRange) {
-              url = `/api/metrics/agent/${this.selectedAgent}/type/${this.selectedMetricType}/timerange/paginated?startTime=${this.timeRange[0]}&endTime=${this.timeRange[1]}&page=${page}&size=${size}`
+              url = `/api/metrics/agent/${this.searchForm.agentId}/type/${this.searchForm.metricType}/timerange/paginated?startTime=${this.searchForm.timeRange[0]}&endTime=${this.searchForm.timeRange[1]}&page=${page}&size=${size}`
             } else {
-              url = `/api/metrics/agent/${this.selectedAgent}/type/${this.selectedMetricType}/paginated?page=${page}&size=${size}`
+              url = `/api/metrics/agent/${this.searchForm.agentId}/type/${this.searchForm.metricType}/paginated?page=${page}&size=${size}`
             }
           } else {
             // Agent only + optional TimeRange
             if (hasTimeRange) {
-              url = `/api/metrics/agent/${this.selectedAgent}/timerange/paginated?startTime=${this.timeRange[0]}&endTime=${this.timeRange[1]}&page=${page}&size=${size}`
+              url = `/api/metrics/agent/${this.searchForm.agentId}/timerange/paginated?startTime=${this.searchForm.timeRange[0]}&endTime=${this.searchForm.timeRange[1]}&page=${page}&size=${size}`
             } else {
-              url = `/api/metrics/agent/${this.selectedAgent}/paginated?page=${page}&size=${size}`
+              url = `/api/metrics/agent/${this.searchForm.agentId}/paginated?page=${page}&size=${size}`
             }
           }
         } else {
           // All agents
-          if (this.selectedMetricType !== 'ALL') {
+          if (this.searchForm.metricType) {
             // MetricType filter without agent - need to load all and filter on frontend
             const response = await fetch('/api/metrics')
             const allMetrics = await response.json()
-            let filtered = allMetrics.filter(m => m.metricType === this.selectedMetricType)
+            let filtered = allMetrics.filter(m => m.metricType === this.searchForm.metricType)
             
             // Apply time range filter if set
             if (hasTimeRange) {
               filtered = filtered.filter(m => 
-                m.timestamp >= parseInt(this.timeRange[0]) && 
-                m.timestamp <= parseInt(this.timeRange[1])
+                m.timestamp >= parseInt(this.searchForm.timeRange[0]) && 
+                m.timestamp <= parseInt(this.searchForm.timeRange[1])
               )
             }
             
@@ -356,12 +375,38 @@ export default {
     filterMetrics() {
       // Filtering is now mostly handled by backend pagination
       // But we still need to handle some frontend filtering for edge cases
-      this.currentPage = 1 // Reset to first page when filters change
+      this.pagination.currentPage = 1 // Reset to first page when filters change
+      this.loadPaginatedData()
+    },
+    
+    handleSearch() {
+      this.pagination.currentPage = 1
+      this.loadPaginatedData()
+    },
+    
+    handleReset() {
+      this.searchForm = {
+        metricType: '',
+        agentId: '',
+        timeRange: null
+      }
+      this.pagination.currentPage = 1
       this.loadPaginatedData()
     },
     
     handlePageChange(newPage) {
-      this.currentPage = newPage
+      this.pagination.currentPage = newPage
+      this.loadPaginatedData()
+    },
+    
+    handleSizeChange(val) {
+      this.pagination.pageSize = val
+      this.pagination.currentPage = 1
+      this.loadPaginatedData()
+    },
+    
+    handleCurrentChange(val) {
+      this.pagination.currentPage = val
       this.loadPaginatedData()
     },
     
@@ -383,13 +428,8 @@ export default {
           return
       }
       
-      this.timeRange = [startTime, now]
-      this.filterMetrics()
-    },
-    
-    clearTimeRange() {
-      this.timeRange = null
-      this.filterMetrics()
+      this.searchForm.timeRange = [startTime, now]
+      this.handleSearch()
     },
     
     renderIndividualCharts() {
@@ -585,10 +625,10 @@ export default {
   font-size: 16px;
 }
 
-.pagination-controls {
+.pagination-container {
   margin-top: 20px;
   display: flex;
-  justify-content: center;
+  justify-content: flex-end;
 }
 
 .charts-grid {

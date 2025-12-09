@@ -1,21 +1,44 @@
 <template>
   <div class="metric-definitions">
 
-    <!-- Action Bar -->
+    <!-- Search and Filter Bar -->
     <el-card shadow="hover" style="margin-bottom: 20px;">
-      <el-alert type="info" :closable="false" style="margin-bottom: 15px;">
-        <template #title>
-          <strong>使用说明</strong>
-        </template>
-        启用指标定义后，系统将自动为所有现有代理创建配置。点击表格左侧的<strong>展开按钮</strong>可查看和配置每个代理的采集设置。
-      </el-alert>
-      <el-button type="primary" @click="openCreateDialog" :icon="Plus">新建指标定义</el-button>
-      <el-button @click="loadDefinitions" :icon="Refresh">刷新</el-button>
+      <el-form :inline="true" :model="searchForm">
+        <el-form-item label="指标名称">
+          <el-input v-model="searchForm.metricName" placeholder="指标名称" clearable style="width: 200px" />
+        </el-form-item>
+        <el-form-item label="显示名称">
+          <el-input v-model="searchForm.displayName" placeholder="显示名称" clearable style="width: 200px" />
+        </el-form-item>
+        <el-form-item label="指标类型">
+          <el-select v-model="searchForm.metricType" placeholder="全部" clearable style="width: 150px">
+            <el-option label="数值型" value="NUMERIC" />
+            <el-option label="布尔型" value="BOOLEAN" />
+            <el-option label="字符型" value="STRING" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="状态">
+          <el-select v-model="searchForm.enabled" placeholder="全部" clearable style="width: 120px">
+            <el-option label="启用" :value="true" />
+            <el-option label="禁用" :value="false" />
+          </el-select>
+        </el-form-item>
+        <el-form-item>
+          <el-button type="primary" @click="handleSearch" :icon="Search">查询</el-button>
+          <el-button @click="handleReset" :icon="RefreshIcon">重置</el-button>
+        </el-form-item>
+      </el-form>
     </el-card>
 
     <!-- Definitions Table -->
     <el-card shadow="hover">
-      <el-table :data="definitions" stripe style="width: 100%" v-loading="loading" row-key="id">
+      <template #header>
+        <div class="card-header">
+          <span>指标定义列表</span>
+          <el-button type="primary" @click="openCreateDialog" :icon="Plus">新建指标定义</el-button>
+        </div>
+      </template>
+      <el-table :data="paginatedDefinitions" stripe style="width: 100%" v-loading="loading" row-key="id">
         <el-table-column type="expand">
           <template #default="props">
             <div style="padding: 20px;">
@@ -123,6 +146,19 @@
           <el-empty description="暂无指标定义" />
         </template>
       </el-table>
+      
+      <!-- Pagination -->
+      <div class="pagination-container">
+        <el-pagination
+          v-model:current-page="pagination.currentPage"
+          v-model:page-size="pagination.pageSize"
+          :page-sizes="[10, 20, 50, 100]"
+          :total="filteredTotal"
+          layout="total, sizes, prev, pager, next, jumper"
+          @size-change="handleSizeChange"
+          @current-change="handleCurrentChange"
+        />
+      </div>
     </el-card>
 
     <!-- Create/Edit Dialog -->
@@ -318,7 +354,7 @@
 </template>
 
 <script>
-import { TrendCharts, Plus, Edit, Delete, Refresh, Promotion } from '@element-plus/icons-vue'
+import { TrendCharts, Plus, Edit, Delete, Refresh, Promotion, Search } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 
 export default {
@@ -329,7 +365,9 @@ export default {
     Edit,
     Delete,
     Refresh,
-    Promotion
+    Promotion,
+    Search,
+    RefreshIcon: Refresh
   },
   data() {
     return {
@@ -337,6 +375,16 @@ export default {
       agents: [],
       agentConfigs: [], // All agent-metric configs
       loading: false,
+      searchForm: {
+        metricName: '',
+        displayName: '',
+        metricType: '',
+        enabled: ''
+      },
+      pagination: {
+        currentPage: 1,
+        pageSize: 10
+      },
       showDialog: false,
       isEditMode: false,
       currentDefinition: {
@@ -358,6 +406,45 @@ export default {
       testResult: null
     }
   },
+  computed: {
+    filteredDefinitions() {
+      let filtered = this.definitions
+      
+      if (this.searchForm.metricName) {
+        filtered = filtered.filter(def => 
+          def.metricName.toLowerCase().includes(this.searchForm.metricName.toLowerCase())
+        )
+      }
+      
+      if (this.searchForm.displayName) {
+        filtered = filtered.filter(def => 
+          def.displayName.toLowerCase().includes(this.searchForm.displayName.toLowerCase())
+        )
+      }
+      
+      if (this.searchForm.metricType) {
+        filtered = filtered.filter(def => 
+          def.metricType === this.searchForm.metricType
+        )
+      }
+      
+      if (this.searchForm.enabled !== '') {
+        filtered = filtered.filter(def => 
+          def.enabled === this.searchForm.enabled
+        )
+      }
+      
+      return filtered
+    },
+    filteredTotal() {
+      return this.filteredDefinitions.length
+    },
+    paginatedDefinitions() {
+      const start = (this.pagination.currentPage - 1) * this.pagination.pageSize
+      const end = start + this.pagination.pageSize
+      return this.filteredDefinitions.slice(start, end)
+    }
+  },
   mounted() {
     this.loadDefinitions()
     this.loadAgents()
@@ -375,6 +462,29 @@ export default {
       } finally {
         this.loading = false
       }
+    },
+    
+    handleSearch() {
+      this.pagination.currentPage = 1
+    },
+    
+    handleReset() {
+      this.searchForm = {
+        metricName: '',
+        displayName: '',
+        metricType: '',
+        enabled: ''
+      }
+      this.pagination.currentPage = 1
+    },
+    
+    handleSizeChange(val) {
+      this.pagination.pageSize = val
+      this.pagination.currentPage = 1
+    },
+    
+    handleCurrentChange(val) {
+      this.pagination.currentPage = val
     },
     
     async loadAgents() {
@@ -807,5 +917,19 @@ export default {
 .command-input :deep(textarea) {
   font-family: 'Courier New', monospace;
   font-size: 13px;
+}
+
+.pagination-container {
+  margin-top: 20px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-weight: 600;
+  font-size: 16px;
 }
 </style>

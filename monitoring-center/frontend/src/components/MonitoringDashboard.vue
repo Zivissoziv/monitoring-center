@@ -35,17 +35,11 @@
       </el-row>
     </el-card>
     
-    <!-- Alert Filters -->
-    <el-card shadow="hover" class="filter-card">
-      <template #header>
-        <div class="card-header">
-          <span>告警筛选</span>
-        </div>
-      </template>
-      <el-form :inline="true" label-width="100px">
+    <!-- Search and Filter Bar -->
+    <el-card shadow="hover" style="margin-bottom: 20px;">
+      <el-form :inline="true" :model="alertFilters">
         <el-form-item label="状态">
-          <el-select v-model="alertFilters.status" @change="filterAlerts" placeholder="全部" style="width: 150px">
-            <el-option label="全部" value="" />
+          <el-select v-model="alertFilters.status" placeholder="全部" clearable style="width: 120px">
             <el-option label="打开" value="ACTIVE" />
             <el-option label="已确认" value="ACKNOWLEDGED" />
             <el-option label="已关闭" value="RESOLVED" />
@@ -53,16 +47,18 @@
         </el-form-item>
         
         <el-form-item label="指标类型">
-          <el-select v-model="alertFilters.metricType" @change="filterAlerts" placeholder="全部" style="width: 150px">
-            <el-option label="全部" value="" />
-            <el-option label="CPU使用率" value="CPU" />
-            <el-option label="内存使用率" value="MEMORY" />
+          <el-select v-model="alertFilters.metricType" placeholder="全部" clearable style="width: 150px">
+            <el-option 
+              v-for="def in metricDefinitions" 
+              :key="def.metricName" 
+              :label="def.displayName" 
+              :value="def.metricName"
+            />
           </el-select>
         </el-form-item>
         
         <el-form-item label="严重程度">
-          <el-select v-model="alertFilters.severity" @change="filterAlerts" placeholder="全部" style="width: 150px">
-            <el-option label="全部" value="" />
+          <el-select v-model="alertFilters.severity" placeholder="全部" clearable style="width: 120px">
             <el-option label="低" value="LOW" />
             <el-option label="中" value="MEDIUM" />
             <el-option label="高" value="HIGH" />
@@ -71,7 +67,24 @@
         </el-form-item>
         
         <el-form-item label="代理IP">
-          <el-input v-model="alertFilters.agentIp" @input="filterAlerts" placeholder="搜索代理IP" style="width: 200px" />
+          <el-input v-model="alertFilters.agentIp" placeholder="搜索代理IP" clearable style="width: 180px" />
+        </el-form-item>
+        
+        <el-form-item label="触发时间">
+          <el-date-picker
+            v-model="alertFilters.timeRange"
+            type="datetimerange"
+            range-separator="至"
+            start-placeholder="开始时间"
+            end-placeholder="结束时间"
+            style="width: 380px"
+            value-format="x"
+          />
+        </el-form-item>
+        
+        <el-form-item>
+          <el-button type="primary" @click="handleSearch" :icon="Search">查询</el-button>
+          <el-button @click="clearFilters" :icon="Refresh">重置</el-button>
         </el-form-item>
       </el-form>
     </el-card>
@@ -81,13 +94,21 @@
       <template #header>
         <div class="card-header">
           <span>告警列表</span>
-          <el-tag v-if="alertFilters.status" type="info" size="small">
-            {{ getStatusText(alertFilters.status) }}
-          </el-tag>
         </div>
       </template>
-      <el-table :data="filteredAlerts" stripe style="width: 100%" v-loading="loading">
+      <el-table :data="paginatedAlerts" stripe style="width: 100%" v-loading="loading">
         <el-table-column prop="id" label="ID" width="80" />
+        <el-table-column label="告警信息" min-width="250">
+          <template #default="scope">
+            <div v-if="scope.row.alertMessage" style="color: #606266; font-weight: 500;">
+              <el-icon style="margin-right: 5px; color: #f56c6c;"><InfoFilled /></el-icon>
+              {{ scope.row.alertMessage }}
+            </div>
+            <div v-else style="color: #909399; font-style: italic;">
+              {{ scope.row.ruleName }}
+            </div>
+          </template>
+        </el-table-column>
         <el-table-column label="指标类型" width="150">
           <template #default="scope">
             <el-tag :type="scope.row.metricType === 'CPU' ? 'danger' : 'primary'" size="small">
@@ -100,12 +121,6 @@
             {{ getAgentIp(scope.row.agentId) }}
           </template>
         </el-table-column>
-        <el-table-column label="触发值" width="120">
-          <template #default="scope">
-            <span class="metric-value">{{ formatValue(scope.row.triggerValue) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column prop="threshold" label="阈值" width="100" />
         <el-table-column label="严重程度" width="120">
           <template #default="scope">
             <el-tag :type="getSeverityType(scope.row.severity)" size="small">
@@ -126,7 +141,7 @@
           </template>
         </el-table-column>
         <el-table-column prop="triggerCount" label="触发次数" width="100" />
-        <el-table-column label="操作" width="200">
+        <el-table-column label="操作" width="200" fixed="right">
           <template #default="scope">
             <el-button type="primary" size="small" @click="openEmergencyDrawer(scope.row)">
               应急处理
@@ -145,6 +160,19 @@
           <el-empty description="暂无告警数据" />
         </template>
       </el-table>
+      
+      <!-- Pagination -->
+      <div class="pagination-container">
+        <el-pagination
+          v-model:current-page="pagination.currentPage"
+          v-model:page-size="pagination.pageSize"
+          :page-sizes="[10, 20, 50, 100]"
+          :total="filteredTotal"
+          layout="total, sizes, prev, pager, next, jumper"
+          @size-change="handleAlertSizeChange"
+          @current-change="handleAlertCurrentChange"
+        />
+      </div>
     </el-card>
     
     <!-- Emergency Drawer -->
@@ -162,9 +190,19 @@
                 {{ getMetricTypeName(selectedAlert.metricType) }}
               </el-tag>
             </el-descriptions-item>
+            <el-descriptions-item label="告警信息" :span="2" v-if="selectedAlert.alertMessage">
+              <div style="color: #606266; padding: 8px; background: #f5f7fa; border-radius: 4px;">
+                <el-icon style="margin-right: 5px; color: #f56c6c;"><InfoFilled /></el-icon>
+                {{ selectedAlert.alertMessage }}
+              </div>
+            </el-descriptions-item>
             <el-descriptions-item label="代理IP">{{ getAgentIp(selectedAlert.agentId) }}</el-descriptions-item>
-            <el-descriptions-item label="触发值">{{ formatValue(selectedAlert.triggerValue) }}</el-descriptions-item>
-            <el-descriptions-item label="阈值">{{ selectedAlert.threshold }}</el-descriptions-item>
+            <el-descriptions-item label="触发值">
+              {{ formatAlertValue(selectedAlert) }}
+            </el-descriptions-item>
+            <el-descriptions-item label="阈值">
+              {{ formatThresholdValue(selectedAlert) }}
+            </el-descriptions-item>
             <el-descriptions-item label="严重程度">
               <el-tag :type="getSeverityType(selectedAlert.severity)" size="small">
                 {{ getSeverityText(selectedAlert.severity) }}
@@ -282,19 +320,24 @@
           <template #header>
             <div style="display: flex; justify-content: space-between; align-items: center;">
               <span style="font-weight: 600; color: #1976d2;">监控指标视图</span>
-              <el-radio-group v-model="metricViewMode" size="small">
-                <el-radio-button label="chart">图表视图</el-radio-button>
+              <el-radio-group v-model="metricViewMode" size="small" :disabled="isChartViewDisabled">
+                <el-radio-button label="chart" :disabled="isChartViewDisabled">图表视图</el-radio-button>
                 <el-radio-button label="table">表格视图</el-radio-button>
               </el-radio-group>
             </div>
           </template>
           
           <!-- Chart View -->
-          <div v-if="metricViewMode === 'chart'" style="height:300px">
+          <div v-if="metricViewMode === 'chart' && !isChartViewDisabled" style="height:300px">
             <div style="display:flex;justify-content:flex-end;margin-bottom:10px">
               <el-button size="small" @click="refreshChart">刷新图表</el-button>
             </div>
             <canvas ref="chartCanvasRef" style="width:100%;height:calc(100% - 40px)"></canvas>
+          </div>
+          
+          <!-- Disabled Chart View Message -->
+          <div v-if="metricViewMode === 'chart' && isChartViewDisabled" style="padding: 40px; text-align: center;">
+            <el-empty description="布尔类型指标不支持图表视图，请使用表格视图" :image-size="100" />
           </div>
           
           <!-- Table View -->
@@ -307,7 +350,7 @@
               </el-table-column>
               <el-table-column label="数值" width="120">
                 <template #default="scope">
-                  <span class="metric-value">{{ formatValue(scope.row.value) }}</span>
+                  <span class="metric-value">{{ formatMetricValue(scope.row) }}</span>
                 </template>
               </el-table-column>
               <template #empty>
@@ -414,7 +457,7 @@
 </template>
 
 <script>
-import { DataBoard, Bell, ArrowDown, ArrowRight, CircleCheck, List } from '@element-plus/icons-vue'
+import { DataBoard, Bell, ArrowDown, ArrowRight, CircleCheck, List, InfoFilled, Refresh, Search } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { Chart } from 'chart.js/auto'
 import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
@@ -427,18 +470,27 @@ export default {
     ArrowDown,
     ArrowRight,
     CircleCheck,
-    List
+    List,
+    InfoFilled,
+    Refresh,
+    Search
   },
   setup() {
     const alerts = ref([])
     const agents = ref([])
+    const metricDefinitions = ref([])
     const loading = ref(false)
     const refreshInterval = ref(null)
     const alertFilters = ref({
       agentIp: '',
       severity: '',
       metricType: '',
-      status: 'ACTIVE' // Default to show ACTIVE alerts
+      status: 'ACTIVE', // Default to show ACTIVE alerts
+      timeRange: null // Date range for last triggered time
+    })
+    const pagination = ref({
+      currentPage: 1,
+      pageSize: 10
     })
     const isEmergencyDrawerOpen = ref(false)
     const selectedAlert = ref(null)
@@ -503,14 +555,47 @@ export default {
         })
       }
       
+      // Filter by time range (last triggered time)
+      if (alertFilters.value.timeRange && alertFilters.value.timeRange.length === 2) {
+        const [startTime, endTime] = alertFilters.value.timeRange
+        filtered = filtered.filter(alert => {
+          const lastTriggered = alert.lastTriggeredAt
+          return lastTriggered >= parseInt(startTime) && lastTriggered <= parseInt(endTime)
+        })
+      }
+      
       // Sort by last triggered time (newest first)
       return filtered.sort((a, b) => b.lastTriggeredAt - a.lastTriggeredAt)
+    })
+    
+    const filteredTotal = computed(() => {
+      return filteredAlerts.value.length
+    })
+    
+    const paginatedAlerts = computed(() => {
+      const start = (pagination.value.currentPage - 1) * pagination.value.pageSize
+      const end = start + pagination.value.pageSize
+      return filteredAlerts.value.slice(start, end)
     })
     
     const paginatedMetrics = computed(() => {
       const startIndex = (currentPage.value - 1) * itemsPerPage.value
       const endIndex = startIndex + itemsPerPage.value
       return metricsForSelectedAlert.value.slice(startIndex, endIndex)
+    })
+    
+    // Check if chart view should be disabled based on metric type
+    const isChartViewDisabled = computed(() => {
+      if (!selectedAlert.value) return false
+      const metricDef = metricDefinitions.value.find(def => def.metricName === selectedAlert.value.metricType)
+      return metricDef && metricDef.metricType === 'BOOLEAN'
+    })
+    
+    // Get current metric type for selected alert
+    const currentAlertMetricType = computed(() => {
+      if (!selectedAlert.value) return 'NUMERIC'
+      const metricDef = metricDefinitions.value.find(def => def.metricName === selectedAlert.value.metricType)
+      return metricDef ? metricDef.metricType : 'NUMERIC'
     })
     
     // Watchers
@@ -580,6 +665,12 @@ export default {
     
     // Lifecycle hooks
     onMounted(() => {
+      // Set default time range to today
+      const now = new Date()
+      const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0)
+      const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59)
+      alertFilters.value.timeRange = [startOfToday.getTime(), endOfToday.getTime()]
+      
       loadData()
       // Remove auto-refresh
       // refreshInterval.value = setInterval(loadData, 30000)
@@ -618,6 +709,10 @@ export default {
         // Load agents to get IP addresses
         const agentsResponse = await fetch('/api/agents')
         agents.value = await agentsResponse.json()
+        
+        // Load metric definitions
+        const metricDefsResponse = await fetch('/api/metric-definitions')
+        metricDefinitions.value = await metricDefsResponse.json()
       } catch (error) {
         console.error('Error loading dashboard data:', error)
         ElMessage.error('加载数据失败')
@@ -629,6 +724,32 @@ export default {
     const filterAlerts = () => {
       // Filtering is handled by the computed property filteredAlerts
       // This method is called on input changes to trigger reactivity
+      pagination.value.currentPage = 1
+    }
+    
+    const handleSearch = () => {
+      pagination.value.currentPage = 1
+    }
+    
+    const clearFilters = () => {
+      alertFilters.value = {
+        agentIp: '',
+        severity: '',
+        metricType: '',
+        status: 'ACTIVE',
+        timeRange: null
+      }
+      pagination.value.currentPage = 1
+      ElMessage.success('筛选条件已清空')
+    }
+    
+    const handleAlertSizeChange = (val) => {
+      pagination.value.pageSize = val
+      pagination.value.currentPage = 1
+    }
+    
+    const handleAlertCurrentChange = (val) => {
+      pagination.value.currentPage = val
     }
     
     const loadMetricsForAlert = async () => {
@@ -900,6 +1021,55 @@ export default {
       return value.toFixed(2) + '%'
     }
     
+    const formatAlertValue = (alert) => {
+      const metricType = currentAlertMetricType.value
+      if (metricType === 'BOOLEAN') {
+        if (alert.triggerValue !== null && alert.triggerValue !== undefined) {
+          return alert.triggerValue > 0.5 ? 'true' : 'false'
+        }
+        return alert.triggerValueText || '-'
+      } else if (metricType === 'STRING') {
+        return alert.triggerValueText || '-'
+      } else {
+        // NUMERIC
+        if (alert.triggerValue !== null && alert.triggerValue !== undefined) {
+          return alert.triggerValue.toFixed(2)
+        }
+        return '-'
+      }
+    }
+    
+    const formatThresholdValue = (alert) => {
+      const metricType = currentAlertMetricType.value
+      if (metricType === 'BOOLEAN' || metricType === 'STRING') {
+        return alert.thresholdText || '-'
+      } else {
+        // NUMERIC
+        if (alert.threshold !== null && alert.threshold !== undefined) {
+          return alert.threshold.toFixed(2)
+        }
+        return '-'
+      }
+    }
+    
+    const formatMetricValue = (metric) => {
+      const metricType = currentAlertMetricType.value
+      if (metricType === 'BOOLEAN') {
+        if (metric.value !== null && metric.value !== undefined) {
+          return metric.value > 0.5 ? 'true' : 'false'
+        }
+        return metric.textValue || '-'
+      } else if (metricType === 'STRING') {
+        return metric.textValue || '-'
+      } else {
+        // NUMERIC
+        if (metric.value !== null && metric.value !== undefined) {
+          return metric.value.toFixed(2)
+        }
+        return '-'
+      }
+    }
+    
     const formatTime = (timestamp) => {
       if (!timestamp) return '-'
       return new Date(timestamp).toLocaleString('zh-CN')
@@ -912,7 +1082,15 @@ export default {
     
     const openEmergencyDrawer = async (alert) => {
       selectedAlert.value = alert
-      metricViewMode.value = 'chart' // Default to chart view
+      
+      // Check if chart view should be disabled and switch to table if needed
+      const metricDef = metricDefinitions.value.find(def => def.metricName === alert.metricType)
+      if (metricDef && metricDef.metricType === 'BOOLEAN') {
+        metricViewMode.value = 'table' // Force table view for boolean metrics
+      } else {
+        metricViewMode.value = 'chart' // Default to chart view for other types
+      }
+      
       isEmergencyDrawerOpen.value = true
       
       // Load emergency knowledge for this alert's rule
@@ -1114,7 +1292,9 @@ export default {
       // Reactive data
       alerts,
       agents,
+      metricDefinitions,
       alertFilters,
+      pagination,
       isEmergencyDrawerOpen,
       selectedAlert,
       metricViewMode,
@@ -1139,7 +1319,11 @@ export default {
       resolvedAlertsCount,
       totalAlertsCount,
       filteredAlerts,
+      filteredTotal,
+      paginatedAlerts,
       paginatedMetrics,
+      isChartViewDisabled,
+      currentAlertMetricType,
       
       // Methods
       getAgentIp,
@@ -1151,6 +1335,9 @@ export default {
       getSeverityText,
       getAgentName,
       formatValue,
+      formatAlertValue,
+      formatThresholdValue,
+      formatMetricValue,
       formatTime,
       formatTimeShort,
       openEmergencyDrawer,
@@ -1162,6 +1349,10 @@ export default {
       executeCommand,
       clearCommandResult,
       filterAlerts,
+      handleSearch,
+      clearFilters,
+      handleAlertSizeChange,
+      handleAlertCurrentChange,
       handleResize, // Add handleResize to returned values
       refreshChart, // Add refreshChart to returned values
       findStepNumber, // Add findStepNumber to returned values
@@ -1271,6 +1462,12 @@ export default {
 .error-text {
   background: #fff3f3;
   color: #f56c6c;
+}
+
+.pagination-container {
+  margin-top: 20px;
+  display: flex;
+  justify-content: flex-end;
 }
 
 /* General Card Styles */
