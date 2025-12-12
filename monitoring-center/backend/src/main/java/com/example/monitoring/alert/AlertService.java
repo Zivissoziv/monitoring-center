@@ -64,6 +64,23 @@ public class AlertService {
         alertRuleRepository.delete(alertRule);
     }
 
+    /**
+     * Check alert for a specific metric and rule (called by event listener)
+     */
+    public boolean checkAlert(Metric metric, AlertRule rule) {
+        // Get metric definition to determine metric type
+        Optional<MetricDefinition> metricDefOpt = metricDefinitionRepository.findByMetricName(metric.getMetricType());
+        String metricType = metricDefOpt.map(MetricDefinition::getMetricType).orElse("NUMERIC");
+        
+        // Record or update alert
+        recordAlert(rule, metric);
+        
+        return true;
+    }
+    
+    /**
+     * Legacy method for backward compatibility
+     */
     public boolean checkAlert(Metric metric) {
         // Get metric definition to determine metric type
         Optional<MetricDefinition> metricDefOpt = metricDefinitionRepository.findByMetricName(metric.getMetricType());

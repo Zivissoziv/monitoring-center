@@ -4,7 +4,12 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import javax.persistence.*;
+import javax.persistence.Column;
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.GenerationType;
+import javax.persistence.Id;
+import javax.persistence.Table;
 
 @Entity
 @Table(name = "emergency_steps")
@@ -22,10 +27,16 @@ public class EmergencyStep {
     @Column(name = "step_order")
     private int stepOrder; // Execution order of the step
     
+    @Column(name = "step_type", length = 20)
+    private String stepType; // COMMAND or URL_JUMP
+    
     private String description; // Description of the step
     
     @Column(name = "linux_command", length = 2000)
-    private String linuxCommand; // Linux command to execute
+    private String linuxCommand; // Linux command to execute (for COMMAND type)
+    
+    @Column(name = "jump_url", length = 1000)
+    private String jumpUrl; // URL to jump to (for URL_JUMP type)
     
     @Column(name = "agent_id")
     private String agentId; // ID of the agent to execute on (null = use alert's agent)

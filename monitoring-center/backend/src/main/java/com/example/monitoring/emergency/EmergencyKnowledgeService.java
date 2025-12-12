@@ -4,8 +4,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service
 public class EmergencyKnowledgeService {
@@ -15,45 +17,74 @@ public class EmergencyKnowledgeService {
 
     @Autowired
     private EmergencyStepRepository stepRepository;
+    
+    @Autowired
+    private AlertRuleEmergencyRepository alertRuleEmergencyRepository;
 
     public List<EmergencyKnowledge> getAllKnowledge() {
         List<EmergencyKnowledge> knowledgeList = knowledgeRepository.findAll();
-        // Load steps for each knowledge
+        // Load steps and alert rule associations for each knowledge
         for (EmergencyKnowledge knowledge : knowledgeList) {
             List<EmergencyStep> steps = stepRepository.findByKnowledgeIdOrderByStepOrderAsc(knowledge.getId());
             knowledge.setSteps(steps);
+            
+            // Load associated alert rule IDs
+            List<AlertRuleEmergency> associations = alertRuleEmergencyRepository.findByEmergencyKnowledgeId(knowledge.getId());
+            List<Long> alertRuleIds = associations.stream()
+                    .map(AlertRuleEmergency::getAlertRuleId)
+                    .collect(Collectors.toList());
+            knowledge.setAlertRuleIds(alertRuleIds);
+        }
+        return knowledgeList;
+    }
+    
+    public List<EmergencyKnowledge> getKnowledgeByAlertRuleId(Long alertRuleId) {
+        List<AlertRuleEmergency> associations = alertRuleEmergencyRepository.findByAlertRuleId(alertRuleId);
+        List<EmergencyKnowledge> knowledgeList = new ArrayList<>();
+        
+        for (AlertRuleEmergency association : associations) {
+            Optional<EmergencyKnowledge> knowledgeOpt = knowledgeRepository.findById(association.getEmergencyKnowledgeId());
+            if (knowledgeOpt.isPresent()) {
+                EmergencyKnowledge knowledge = knowledgeOpt.get();
+                List<EmergencyStep> steps = stepRepository.findByKnowledgeIdOrderByStepOrderAsc(knowledge.getId());
+                knowledge.setSteps(steps);
+                
+                // Load all associated alert rule IDs
+                List<AlertRuleEmergency> allAssociations = alertRuleEmergencyRepository.findByEmergencyKnowledgeId(knowledge.getId());
+                List<Long> alertRuleIds = allAssociations.stream()
+                        .map(AlertRuleEmergency::getAlertRuleId)
+                        .collect(Collectors.toList());
+                knowledge.setAlertRuleIds(alertRuleIds);
+                
+                knowledgeList.add(knowledge);
+            }
         }
         return knowledgeList;
     }
 
-    public Optional<EmergencyKnowledge> getKnowledgeByAlertRuleId(Long alertRuleId) {
-        Optional<EmergencyKnowledge> knowledgeOpt = knowledgeRepository.findByAlertRuleId(alertRuleId);
-        if (knowledgeOpt.isPresent()) {
-            EmergencyKnowledge knowledge = knowledgeOpt.get();
-            List<EmergencyStep> steps = stepRepository.findByKnowledgeIdOrderByStepOrderAsc(knowledge.getId());
-            knowledge.setSteps(steps);
-        }
-        return knowledgeOpt;
-    }
-
     @Transactional
     public EmergencyKnowledge createOrUpdateKnowledge(EmergencyKnowledge knowledge) {
-        // Check if knowledge already exists for this alert rule
-        Optional<EmergencyKnowledge> existingOpt = knowledgeRepository.findByAlertRuleId(knowledge.getAlertRuleId());
-        
         EmergencyKnowledge savedKnowledge;
-        if (existingOpt.isPresent()) {
+        
+        if (knowledge.getId() != null) {
             // Update existing
-            EmergencyKnowledge existing = existingOpt.get();
-            existing.setTitle(knowledge.getTitle());
-            existing.setDescription(knowledge.getDescription());
-            existing.setUpdatedAt(System.currentTimeMillis());
-            savedKnowledge = knowledgeRepository.save(existing);
-            
-            // Delete old steps
-            stepRepository.deleteByKnowledgeId(savedKnowledge.getId());
+            Optional<EmergencyKnowledge> existingOpt = knowledgeRepository.findById(knowledge.getId());
+            if (existingOpt.isPresent()) {
+                EmergencyKnowledge existing = existingOpt.get();
+                existing.setTitle(knowledge.getTitle());
+                existing.setDescription(knowledge.getDescription());
+                existing.setUpdatedAt(System.currentTimeMillis());
+                savedKnowledge = knowledgeRepository.save(existing);
+                
+                // Delete old steps
+                stepRepository.deleteByKnowledgeId(savedKnowledge.getId());
+            } else {
+                savedKnowledge = knowledgeRepository.save(knowledge);
+            }
         } else {
             // Create new
+            knowledge.setCreatedAt(System.currentTimeMillis());
+            knowledge.setUpdatedAt(System.currentTimeMillis());
             savedKnowledge = knowledgeRepository.save(knowledge);
         }
         
@@ -66,6 +97,19 @@ public class EmergencyKnowledgeService {
             savedKnowledge.setSteps(knowledge.getSteps());
         }
         
+        // Update alert rule associations
+        if (knowledge.getAlertRuleIds() != null) {
+            // Delete old associations
+            alertRuleEmergencyRepository.deleteByEmergencyKnowledgeId(savedKnowledge.getId());
+            
+            // Create new associations
+            for (Long alertRuleId : knowledge.getAlertRuleIds()) {
+                AlertRuleEmergency association = new AlertRuleEmergency(alertRuleId, savedKnowledge.getId());
+                alertRuleEmergencyRepository.save(association);
+            }
+            savedKnowledge.setAlertRuleIds(knowledge.getAlertRuleIds());
+        }
+        
         return savedKnowledge;
     }
 
@@ -73,15 +117,9 @@ public class EmergencyKnowledgeService {
     public void deleteKnowledge(Long id) {
         // Delete all steps first
         stepRepository.deleteByKnowledgeId(id);
+        // Delete associations
+        alertRuleEmergencyRepository.deleteByEmergencyKnowledgeId(id);
         // Delete knowledge
         knowledgeRepository.deleteById(id);
-    }
-
-    @Transactional
-    public void deleteKnowledgeByAlertRuleId(Long alertRuleId) {
-        Optional<EmergencyKnowledge> knowledgeOpt = knowledgeRepository.findByAlertRuleId(alertRuleId);
-        if (knowledgeOpt.isPresent()) {
-            deleteKnowledge(knowledgeOpt.get().getId());
-        }
     }
 }

@@ -2,10 +2,16 @@ package com.example.monitoring.emergency;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
-import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/emergency")
@@ -21,9 +27,8 @@ public class EmergencyKnowledgeController {
     }
 
     @GetMapping("/alert-rule/{alertRuleId}")
-    public ResponseEntity<EmergencyKnowledge> getKnowledgeByAlertRuleId(@PathVariable Long alertRuleId) {
-        Optional<EmergencyKnowledge> knowledge = knowledgeService.getKnowledgeByAlertRuleId(alertRuleId);
-        return knowledge.map(ResponseEntity::ok).orElseGet(() -> ResponseEntity.notFound().build());
+    public List<EmergencyKnowledge> getKnowledgeByAlertRuleId(@PathVariable Long alertRuleId) {
+        return knowledgeService.getKnowledgeByAlertRuleId(alertRuleId);
     }
 
     @PostMapping
@@ -34,12 +39,6 @@ public class EmergencyKnowledgeController {
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteKnowledge(@PathVariable Long id) {
         knowledgeService.deleteKnowledge(id);
-        return ResponseEntity.noContent().build();
-    }
-
-    @DeleteMapping("/alert-rule/{alertRuleId}")
-    public ResponseEntity<Void> deleteKnowledgeByAlertRuleId(@PathVariable Long alertRuleId) {
-        knowledgeService.deleteKnowledgeByAlertRuleId(alertRuleId);
         return ResponseEntity.noContent().build();
     }
 }

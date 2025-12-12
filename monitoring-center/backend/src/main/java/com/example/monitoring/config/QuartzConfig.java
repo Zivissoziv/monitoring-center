@@ -1,13 +1,17 @@
 package com.example.monitoring.config;
 
-import com.example.monitoring.job.AlertCheckJob;
 import com.example.monitoring.job.MetricCollectionJob;
-import org.quartz.*;
+import org.quartz.JobBuilder;
+import org.quartz.JobDetail;
+import org.quartz.SimpleScheduleBuilder;
+import org.quartz.Trigger;
+import org.quartz.TriggerBuilder;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
  * Quartz configuration for scheduled jobs
+ * Alert checking is now event-driven, so only metric collection job remains
  */
 @Configuration
 public class QuartzConfig {
@@ -38,28 +42,6 @@ public class QuartzConfig {
                 .build();
     }
     
-    /**
-     * Alert check job - runs every 10 seconds
-     */
-    @Bean
-    public JobDetail alertCheckJobDetail() {
-        return JobBuilder.newJob(AlertCheckJob.class)
-                .withIdentity("alertCheckJob")
-                .withDescription("Check alerts for triggered conditions")
-                .storeDurably()
-                .build();
-    }
-    
-    @Bean
-    public Trigger alertCheckTrigger() {
-        // Run every 10 seconds
-        return TriggerBuilder.newTrigger()
-                .forJob(alertCheckJobDetail())
-                .withIdentity("alertCheckTrigger")
-                .withDescription("Trigger for alert checking")
-                .withSchedule(SimpleScheduleBuilder.simpleSchedule()
-                        .withIntervalInSeconds(10)
-                        .repeatForever())
-                .build();
-    }
+    // AlertCheckJob removed - alert processing is now event-driven
+    // Alerts are checked in real-time when metrics are collected via MetricCollectedEvent
 }

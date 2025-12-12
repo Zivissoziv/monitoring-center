@@ -125,7 +125,7 @@
       <template #footer>
         <span class="dialog-footer">
           <el-button @click="dialogVisible = false">取消</el-button>
-          <el-button type="primary" @click="addAgent" :loading="adding" :disabled="!testResult.success">
+          <el-button type="primary" @click="addAgent" :loading="adding">
             {{ adding ? '添加中...' : '确定添加' }}
           </el-button>
         </span>
@@ -230,25 +230,37 @@ export default {
       this.testResult.show = false
       
       try {
-        const url = `http://${this.newAgent.ip}:${this.newAgent.port}/health`
-        const response = await fetch(url, {
-          method: 'GET',
-          signal: AbortSignal.timeout(5000) // 5 second timeout
+        // Use backend API to test connection (avoid CORS issues)
+        const response = await fetch('/api/agents/test-connection', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            ip: this.newAgent.ip,
+            port: this.newAgent.port
+          })
         })
         
         if (response.ok) {
           const data = await response.json()
-          this.testResult = {
-            show: true,
-            type: 'success',
-            message: `连接成功！代理状态: ${data.status}, 名称: ${data.agentName || '未知'}`,
-            success: true
-          }
-          ElMessage.success('代理连接测试成功')
           
-          // Auto-fill name if not set
-          if (!this.newAgent.name && data.agentName) {
-            this.newAgent.name = data.agentName
+          if (data.success) {
+            this.testResult = {
+              show: true,
+              type: 'success',
+              message: `连接成功！代理状态: ${data.status}`,
+              success: true
+            }
+            ElMessage.success('代理连接测试成功')
+          } else {
+            this.testResult = {
+              show: true,
+              type: 'error',
+              message: `连接失败！${data.message || '无法连接到代理'}`,
+              success: false
+            }
+            ElMessage.error('代理连接测试失败')
           }
         } else {
           this.testResult = {
@@ -263,7 +275,7 @@ export default {
         this.testResult = {
           show: true,
           type: 'error',
-          message: `连接失败！错误: ${error.message || '无法连接到代理'}`,
+          message: `连接失败！错误: ${error.message || '网络错误'}`,
           success: false
         }
         ElMessage.error('代理连接测试失败: ' + (error.message || '超时或网络错误'))
@@ -312,11 +324,6 @@ export default {
         return
       }
       
-      if (!this.testResult.success) {
-        ElMessage.warning('请先测试连接')
-        return
-      }
-      
       this.adding = true
       
       try {
@@ -335,12 +342,16 @@ export default {
           this.dialogVisible = false
           this.newAgent = { name: '', ip: '', port: 8080 }
           this.testResult = { show: false, type: 'info', message: '', success: false }
+          // Reload agents to get updated data
+          await this.loadAgents()
         } else {
-          ElMessage.error('代理添加失败')
+          const errorText = await response.text()
+          console.error('Add agent failed:', response.status, errorText)
+          ElMessage.error(`代理添加失败: ${response.status} ${errorText || ''}`)
         }
       } catch (error) {
         console.error('Error adding agent:', error)
-        ElMessage.error('代理添加失败')
+        ElMessage.error('代理添加失败: ' + error.message)
       } finally {
         this.adding = false
       }

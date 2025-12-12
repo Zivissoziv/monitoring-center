@@ -1,6 +1,7 @@
 package com.example.monitoring.agent;
 
 import com.example.monitoring.alert.AlertService;
+import com.example.monitoring.event.MetricCollectedEvent;
 import com.example.monitoring.metric.Metric;
 import com.example.monitoring.metric.MetricRepository;
 import com.example.monitoring.metric.MetricDefinition;
@@ -9,6 +10,7 @@ import com.example.monitoring.metric.AgentMetricConfig;
 import com.example.monitoring.metric.AgentMetricConfigService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
@@ -37,6 +39,9 @@ public class AgentService {
     
     @Autowired
     private AgentMetricConfigService agentMetricConfigService;
+    
+    @Autowired
+    private ApplicationEventPublisher eventPublisher;
     
     private final RestTemplate restTemplate = new RestTemplate();
     
@@ -95,6 +100,7 @@ public class AgentService {
                 agent.setStatus("DISCONNECTED");
             }
         } catch (Exception e) {
+            log.error("Failed to check agent health for {}: {}", agent.getId(), e.getMessage(), e);
             agent.setStatus("DISCONNECTED");
         }
         agentRepository.save(agent);
@@ -162,8 +168,8 @@ public class AgentService {
                 metric.setTimestamp(now);
                 Metric savedMetric = metricRepository.save(metric);
                 
-                // Check alerts
-                alertService.checkAlert(savedMetric);
+                // Publish event for real-time alert processing
+                eventPublisher.publishEvent(new MetricCollectedEvent(savedMetric));
                 
                 // Update last collection time
                 agentMetricConfigService.updateLastCollectionTime(agentId, config.getMetricName());
@@ -174,7 +180,7 @@ public class AgentService {
                 
             } catch (Exception e) {
                 log.error("Error collecting metric {} from agent {}: {}", 
-                        config.getMetricName(), agentId, e.getMessage());
+                        config.getMetricName(), agentId, e.getMessage(), e);
             }
         }
     }
@@ -214,6 +220,7 @@ public class AgentService {
                 throw new RuntimeException("Failed to execute command on agent: " + response.getStatusCode());
             }
         } catch (Exception e) {
+            log.error("Failed to execute command on agent {}: {}", agentId, e.getMessage(), e);
             Map<String, Object> errorResponse = new HashMap<>();
             errorResponse.put("error", "Failed to execute command: " + e.getMessage());
             errorResponse.put("timestamp", System.currentTimeMillis());

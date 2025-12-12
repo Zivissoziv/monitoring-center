@@ -176,7 +176,7 @@
     </el-card>
     
     <!-- Emergency Drawer -->
-    <el-drawer v-model="isEmergencyDrawerOpen" title="应急处理指南" direction="rtl" size="700px">
+    <el-drawer v-model="isEmergencyDrawerOpen" title="应急处理指南" direction="rtl" size="60%">
       <div v-if="selectedAlert">
         <!-- Alert Details -->
         <el-card class="mb-3" shadow="hover">
@@ -220,97 +220,156 @@
             <span style="font-weight: 600; color: #1976d2;">应急处理步骤</span>
           </template>
           
-          <!-- Emergency Knowledge Base -->
-          <div v-if="emergencyKnowledge && emergencyKnowledge.steps && emergencyKnowledge.steps.length > 0">
-            <el-alert type="info" :closable="false" style="margin-bottom: 15px;">
-              <template #title>
-                <strong>{{ emergencyKnowledge.title }}</strong>
-              </template>
-              <p v-if="emergencyKnowledge.description" style="margin: 5px 0 0 0;">{{ emergencyKnowledge.description }}</p>
-            </el-alert>
-            
-            <el-timeline>
-              <el-timeline-item 
-                v-for="(step, index) in emergencyKnowledge.steps" 
-                :key="step.id"
-                :timestamp="`步骤 ${index + 1}`"
-                placement="top"
+          <!-- Emergency Knowledge Selection -->
+          <div v-if="emergencyKnowledge && emergencyKnowledge.length > 0">
+            <!-- Knowledge Base Selector -->
+            <div style="margin-bottom: 20px;">
+              <el-select 
+                v-model="selectedKnowledgeIndex" 
+                placeholder="请选择应急知识库" 
+                style="width: 100%"
+                size="large"
               >
-                <el-card shadow="hover">
-                  <template #header>
-                    <div style="font-weight: 600; color: #1976d2;">{{ step.description }}</div>
+                <el-option 
+                  v-for="(knowledge, index) in emergencyKnowledge" 
+                  :key="knowledge.id" 
+                  :label="knowledge.title" 
+                  :value="index"
+                >
+                  <div>
+                    <div style="font-weight: 600;">{{ knowledge.title }}</div>
+                    <div style="font-size: 12px; color: #909399; margin-top: 2px;">
+                      {{ knowledge.description }}
+                    </div>
+                  </div>
+                </el-option>
+              </el-select>
+            </div>
+            
+            <!-- Display Selected Knowledge Base Steps -->
+            <div v-if="selectedKnowledge">
+              <el-alert type="info" :closable="false" style="margin-bottom: 15px;">
+                <template #title>
+                  <strong>{{ selectedKnowledge.title }}</strong>
+                </template>
+                <p v-if="selectedKnowledge.description" style="margin: 5px 0 0 0;">{{ selectedKnowledge.description }}</p>
+              </el-alert>
+              
+              <!-- Steps Table -->
+              <el-table 
+                v-if="selectedKnowledge.steps && selectedKnowledge.steps.length > 0"
+                :data="selectedKnowledge.steps" 
+                stripe 
+                style="width: 100%"
+              >
+                <el-table-column type="index" label="步骤" width="80" :index="(index) => index + 1" />
+                
+                <el-table-column label="描述" min-width="150">
+                  <template #default="scope">
+                    <div style="font-weight: 600; color: #1976d2;">{{ scope.row.description }}</div>
+                    <div v-if="scope.row.notes" style="font-size: 12px; color: #909399; margin-top: 4px;">
+                      <el-icon><InfoFilled /></el-icon> {{ scope.row.notes }}
+                    </div>
                   </template>
-                  
-                  <div class="command-box">
-                    <div class="command-label">执行命令：</div>
-                    <pre class="command-text">{{ step.linuxCommand }}</pre>
-                    <div style="display: flex; gap: 10px; margin-top: 10px;">
+                </el-table-column>
+                
+                <el-table-column label="内容" min-width="250">
+                  <template #default="scope">
+                    <div v-if="scope.row.stepType === 'URL_JUMP'">
+                      <div style="display: flex; align-items: center; gap: 8px;">
+                        <el-icon color="#1976d2"><Link /></el-icon>
+                        <el-link :href="scope.row.jumpUrl" target="_blank" type="primary" style="font-size: 12px;">
+                          {{ scope.row.jumpUrl }}
+                        </el-link>
+                      </div>
+                    </div>
+                    <pre v-else style="margin: 0; padding: 8px; background: #f5f5f5; border-radius: 4px; font-size: 12px; overflow-x: auto;">{{ scope.row.linuxCommand }}</pre>
+                  </template>
+                </el-table-column>
+                
+                <el-table-column label="执行代理" width="150">
+                  <template #default="scope">
+                    <el-tag v-if="scope.row.agentId" size="small" type="success">
+                      {{ getAgentName(scope.row.agentId) }}
+                    </el-tag>
+                    <span v-else style="color: #909399;">告警代理</span>
+                  </template>
+                </el-table-column>
+                
+                <el-table-column label="操作" width="200" fixed="right">
+                  <template #default="scope">
+                    <el-button 
+                      v-if="scope.row.stepType === 'URL_JUMP'"
+                      size="small"
+                      type="primary"
+                      @click="openReferenceUrl(scope.row.jumpUrl)"
+                      :icon="Link"
+                    >
+                      打开链接
+                    </el-button>
+                    <template v-else>
                       <el-button 
                         size="small"
                         type="primary"
-                        @click="executeStepCommand(step, index)" 
-                        :loading="isExecutingCommand && executingCommand === step.linuxCommand"
+                        @click="executeStepCommand(scope.row, `${selectedKnowledgeIndex}-${scope.$index}`)" 
+                        :loading="isExecutingCommand && executingCommand === scope.row.linuxCommand"
                         :disabled="isExecutingCommand"
                       >
-                        {{ isExecutingCommand && executingCommand === step.linuxCommand ? '执行中' : '执行' }}
+                        {{ isExecutingCommand && executingCommand === scope.row.linuxCommand ? '执行中' : '执行' }}
                       </el-button>
                       <el-button 
                         size="small"
-                        @click="copyCommand(step.linuxCommand)"
+                        @click="copyCommand(scope.row.linuxCommand)"
                       >
-                        复制命令
+                        复制
                       </el-button>
-                    </div>
-                  </div>
-                  
-                  <el-alert v-if="step.agentId" type="success" :closable="false" style="margin-top: 10px;">
-                    执行代理: {{ getAgentName(step.agentId) }}
-                  </el-alert>
-                  <el-alert v-if="step.dependsOn" type="warning" :closable="false" style="margin-top: 10px;">
-                    依赖步骤: 步骤 {{ findStepNumber(step.dependsOn) }}
-                  </el-alert>
-                  <el-alert v-if="step.notes" type="info" :closable="false" style="margin-top: 10px;">
-                    {{ step.notes }}
-                  </el-alert>
-                  
-                  <!-- Command Result Display -->
-                  <el-card v-if="stepResults[index]" class="mt-2" shadow="never">
-                    <template #header>
-                      <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <span style="font-weight: 600; color: #1976d2;">执行结果</span>
-                        <el-button size="small" text @click="clearStepResult(index)">清除</el-button>
-                      </div>
                     </template>
-                    <el-descriptions :column="2" size="small">
-                      <el-descriptions-item label="退出码">
-                        <el-tag :type="stepResults[index].exitCode === 0 ? 'success' : 'danger'" size="small">
-                          {{ stepResults[index].exitCode }}
-                        </el-tag>
-                      </el-descriptions-item>
-                      <el-descriptions-item label="执行时间">
-                        {{ formatTime(stepResults[index].timestamp) }}
-                      </el-descriptions-item>
-                    </el-descriptions>
-                    <el-tabs v-model="stepResultTab[index]" style="margin-top: 10px;">
-                      <el-tab-pane label="标准输出" name="output">
-                        <pre v-if="stepResults[index].output" class="output-text">{{ stepResults[index].output }}</pre>
-                        <el-empty v-else description="无标准输出" :image-size="60" />
-                      </el-tab-pane>
-                      <el-tab-pane label="错误输出" name="error">
-                        <pre v-if="stepResults[index].error" class="error-text">{{ stepResults[index].error }}</pre>
-                        <el-empty v-else description="无错误输出" :image-size="60" />
-                      </el-tab-pane>
-                    </el-tabs>
-                  </el-card>
-                </el-card>
-              </el-timeline-item>
-            </el-timeline>
+                  </template>
+                </el-table-column>
+                
+                <!-- Expandable row for execution result -->
+                <el-table-column type="expand">
+                  <template #default="scope">
+                    <div v-if="stepResults[`${selectedKnowledgeIndex}-${scope.$index}`]" style="padding: 15px;">
+                      <el-card shadow="never">
+                        <template #header>
+                          <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span style="font-weight: 600; color: #1976d2;">执行结果</span>
+                            <el-button size="small" text @click="clearStepResult(`${selectedKnowledgeIndex}-${scope.$index}`)">清除</el-button>
+                          </div>
+                        </template>
+                        <el-descriptions :column="2" size="small" border>
+                          <el-descriptions-item label="退出码">
+                            <el-tag :type="stepResults[`${selectedKnowledgeIndex}-${scope.$index}`].exitCode === 0 ? 'success' : 'danger'" size="small">
+                              {{ stepResults[`${selectedKnowledgeIndex}-${scope.$index}`].exitCode }}
+                            </el-tag>
+                          </el-descriptions-item>
+                          <el-descriptions-item label="执行时间">
+                            {{ formatTime(stepResults[`${selectedKnowledgeIndex}-${scope.$index}`].timestamp) }}
+                          </el-descriptions-item>
+                        </el-descriptions>
+                        <el-tabs v-model="stepResultTab[`${selectedKnowledgeIndex}-${scope.$index}`]" style="margin-top: 10px;">
+                          <el-tab-pane label="标准输出" name="output">
+                            <pre v-if="stepResults[`${selectedKnowledgeIndex}-${scope.$index}`].output" class="output-text">{{ stepResults[`${selectedKnowledgeIndex}-${scope.$index}`].output }}</pre>
+                            <el-empty v-else description="无标准输出" :image-size="60" />
+                          </el-tab-pane>
+                          <el-tab-pane label="错误输出" name="error">
+                            <pre v-if="stepResults[`${selectedKnowledgeIndex}-${scope.$index}`].error" class="error-text">{{ stepResults[`${selectedKnowledgeIndex}-${scope.$index}`].error }}</pre>
+                            <el-empty v-else description="无错误输出" :image-size="60" />
+                          </el-tab-pane>
+                        </el-tabs>
+                      </el-card>
+                    </div>
+                  </template>
+                </el-table-column>
+              </el-table>
+            </div>
           </div>
           
           <!-- Default Steps (if no knowledge base) -->
           <div v-else>
             <el-alert type="warning" :closable="false" style="margin-bottom: 15px;">
-              暂无该告警规则的应急知识库，请在应急知识库页面配置。以下为默认应急流程：
+              暂无该告警规则的应急知识库，请在应急知识库页面配置。
             </el-alert>
           </div>
         </el-card>
@@ -457,7 +516,7 @@
 </template>
 
 <script>
-import { DataBoard, Bell, ArrowDown, ArrowRight, CircleCheck, List, InfoFilled, Refresh, Search } from '@element-plus/icons-vue'
+import { DataBoard, Bell, ArrowDown, ArrowRight, CircleCheck, List, InfoFilled, Refresh, Search, Link } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { Chart } from 'chart.js/auto'
 import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
@@ -473,7 +532,8 @@ export default {
     List,
     InfoFilled,
     Refresh,
-    Search
+    Search,
+    Link
   },
   setup() {
     const alerts = ref([])
@@ -509,7 +569,8 @@ export default {
     const maxDisplayPoints = ref(50) // Maximum points to display in emergency chart
     const activeTab = ref('output') // For tab switching in command result
     const chartCanvasRef = ref(null) // Ref for the chart canvas element
-    const emergencyKnowledge = ref(null) // Emergency knowledge base for the alert rule
+    const emergencyKnowledge = ref([]) // Emergency knowledge base for the alert rule (can be multiple)
+    const selectedKnowledgeIndex = ref(0) // Index of selected knowledge base
     const showCommandWindow = ref(false) // Command window collapsed by default
     const executingCommand = ref('') // Track which command is being executed
     const stepResults = ref({}) // Store results for each step
@@ -596,6 +657,12 @@ export default {
       if (!selectedAlert.value) return 'NUMERIC'
       const metricDef = metricDefinitions.value.find(def => def.metricName === selectedAlert.value.metricType)
       return metricDef ? metricDef.metricType : 'NUMERIC'
+    })
+
+    // Computed property for selected knowledge base
+    const selectedKnowledge = computed(() => {
+      if (!emergencyKnowledge.value || emergencyKnowledge.value.length === 0) return null
+      return emergencyKnowledge.value[selectedKnowledgeIndex.value] || null
     })
     
     // Watchers
@@ -1098,12 +1165,16 @@ export default {
         const response = await fetch(`/api/emergency/alert-rule/${alert.alertRuleId}`)
         if (response.ok) {
           emergencyKnowledge.value = await response.json()
+          // Select first knowledge base by default
+          selectedKnowledgeIndex.value = 0
         } else {
-          emergencyKnowledge.value = null
+          emergencyKnowledge.value = []
+          selectedKnowledgeIndex.value = 0
         }
       } catch (error) {
         console.error('Error loading emergency knowledge:', error)
-        emergencyKnowledge.value = null
+        emergencyKnowledge.value = []
+        selectedKnowledgeIndex.value = 0
       }
       
       // Add a small delay to ensure the drawer is fully opened before loading data
@@ -1265,6 +1336,19 @@ export default {
       delete stepResultTab.value[index]
     }
     
+    const openReferenceUrl = (url) => {
+      if (!url) return
+      
+      // Validate URL format
+      let validUrl = url
+      if (!url.startsWith('http://') && !url.startsWith('https://')) {
+        validUrl = 'https://' + url
+      }
+      
+      // Open in new tab
+      window.open(validUrl, '_blank')
+    }
+    
     const closeAlert = async (alertId) => {
       try {
         const response = await fetch(`/api/alerts/${alertId}/resolve`, {
@@ -1309,6 +1393,7 @@ export default {
       activeTab,
       chartCanvasRef, // Add chartCanvasRef to returned values
       emergencyKnowledge, // Add emergencyKnowledge to returned values
+      selectedKnowledgeIndex, // Add selectedKnowledgeIndex to returned values
       showCommandWindow, // Add showCommandWindow to returned values
       executingCommand, // Add executingCommand to returned values
       stepResults, // Add stepResults to returned values
@@ -1324,6 +1409,7 @@ export default {
       paginatedMetrics,
       isChartViewDisabled,
       currentAlertMetricType,
+      selectedKnowledge, // Add selectedKnowledge to returned values
       
       // Methods
       getAgentIp,
@@ -1359,6 +1445,7 @@ export default {
       executeStepCommand, // Add executeStepCommand to returned values
       copyCommand, // Add copyCommand to returned values
       clearStepResult, // Add clearStepResult to returned values
+      openReferenceUrl, // Add openReferenceUrl to returned values
       closeAlert // Add closeAlert to returned values
     }
   }

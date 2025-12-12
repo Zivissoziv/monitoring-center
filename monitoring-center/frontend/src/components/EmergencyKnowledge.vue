@@ -36,9 +36,14 @@
       <el-table :data="paginatedKnowledgeList" stripe style="width: 100%" v-loading="loading">
         <el-table-column prop="id" label="ID" width="80" />
         <el-table-column prop="title" label="标题" min-width="200" />
-        <el-table-column label="关联告警规则" min-width="180">
+        <el-table-column label="关联告警规则" min-width="250">
           <template #default="scope">
-            {{ getAlertRuleName(scope.row.alertRuleId) }}
+            <el-tag v-for="ruleId in scope.row.alertRuleIds" :key="ruleId" size="small" style="margin-right: 5px;">
+              {{ getAlertRuleName(ruleId) }}
+            </el-tag>
+            <el-tag v-if="!scope.row.alertRuleIds || scope.row.alertRuleIds.length === 0" type="info" size="small">
+              未关联
+            </el-tag>
           </template>
         </el-table-column>
         <el-table-column label="步骤数量" width="120">
@@ -100,11 +105,40 @@
       width="900px"
       :close-on-click-modal="false"
     >
+      <!-- Summary Card for Edit Mode -->
+      <el-alert v-if="isEditMode && currentKnowledge.steps.length > 0" 
+        type="info" 
+        :closable="false" 
+        style="margin-bottom: 20px;"
+      >
+        <template #title>
+          <div style="display: flex; align-items: center; gap: 15px;">
+            <span>当前已有 <strong>{{ currentKnowledge.steps.length }}</strong> 个步骤</span>
+            <el-divider direction="vertical" />
+            <span>
+              <el-icon><Reading /></el-icon>
+              命令步骤: <strong>{{ currentKnowledge.steps.filter(s => s.stepType !== 'URL_JUMP').length }}</strong>
+            </span>
+            <el-divider direction="vertical" />
+            <span>
+              <el-icon><Link /></el-icon>
+              URL跳转: <strong>{{ currentKnowledge.steps.filter(s => s.stepType === 'URL_JUMP').length }}</strong>
+            </span>
+          </div>
+        </template>
+      </el-alert>
+      
       <el-form :model="currentKnowledge" label-width="120px">
         <el-form-item label="关联告警规则" required>
-          <el-select v-model="currentKnowledge.alertRuleId" :disabled="isEditMode" placeholder="请选择告警规则" style="width: 100%">
+          <el-select 
+            v-model="currentKnowledge.alertRuleIds" 
+            placeholder="请选择告警规则（可多选）" 
+            style="width: 100%"
+            multiple
+            filterable
+          >
             <el-option 
-              v-for="rule in availableAlertRules" 
+              v-for="rule in alertRules" 
               :key="rule.id" 
               :label="rule.name" 
               :value="rule.id"
@@ -127,15 +161,28 @@
         
         <div class="steps-section">
           <div class="steps-header">
-            <el-button type="success" @click="addStep" :icon="Plus" size="small">添加步骤</el-button>
+            <el-button type="success" @click="addStep" :icon="Plus" size="default">
+              <span style="font-weight: 600;">添加步骤</span>
+            </el-button>
           </div>
           
-          <el-empty v-if="currentKnowledge.steps.length === 0" description="暂无操作步骤，请添加" />
+          <el-empty v-if="currentKnowledge.steps.length === 0" description="暂无操作步骤，请添加">
+            <el-button type="primary" @click="addStep" :icon="Plus">立即添加第一个步骤</el-button>
+          </el-empty>
           
-          <el-card v-for="(step, index) in currentKnowledge.steps" :key="index" class="step-item" shadow="hover">
+          <el-card v-for="(step, index) in currentKnowledge.steps" :key="index" class="step-item" shadow="hover" 
+            :style="{ borderLeft: step.stepType === 'URL_JUMP' ? '4px solid #67c23a' : '4px solid #409eff' }">
             <template #header>
               <div class="step-header">
-                <span class="step-number">步骤 {{ index + 1 }}</span>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                  <span class="step-number">步骤 {{ index + 1 }}</span>
+                  <el-tag v-if="step.stepType === 'URL_JUMP'" type="success" size="small">
+                    <el-icon><Link /></el-icon> URL跳转
+                  </el-tag>
+                  <el-tag v-else type="primary" size="small">
+                    <el-icon><Reading /></el-icon> 执行命令
+                  </el-tag>
+                </div>
                 <div class="step-actions">
                   <el-button-group size="small">
                     <el-button v-if="index > 0" @click="moveStepUp(index)" :icon="Top">上移</el-button>
@@ -150,11 +197,33 @@
               <el-input v-model="step.description" placeholder="请描述该步骤的目的" />
             </el-form-item>
             
-            <el-form-item label="Linux命令" required>
-              <el-input v-model="step.linuxCommand" type="textarea" :rows="2" placeholder="输入要执行的Linux命令" class="command-input" />
+            <el-form-item label="步骤类型" required>
+              <el-radio-group v-model="step.stepType">
+                <el-radio label="COMMAND">执行命令</el-radio>
+                <el-radio label="URL_JUMP">URL跳转</el-radio>
+              </el-radio-group>
             </el-form-item>
             
-            <el-row :gutter="20">
+            <el-form-item v-if="step.stepType === 'COMMAND'" label="Linux命令" required>
+              <el-input v-model="step.linuxCommand" type="textarea" :rows="2" placeholder="输入要执行的Linux命令" class="command-input" />
+              <div style="font-size: 12px; color: #909399; margin-top: 4px;">
+                <el-icon><InfoFilled /></el-icon> 命令将在指定的代理机器上执行
+              </div>
+            </el-form-item>
+            
+            <el-form-item v-if="step.stepType === 'URL_JUMP'" label="跳转URL" required>
+              <el-input v-model="step.jumpUrl" placeholder="输入要跳转的URL地址">
+                <template #prepend>
+                  <el-icon><Link /></el-icon>
+                </template>
+              </el-input>
+              <div style="font-size: 12px; color: #909399; margin-top: 4px;">
+                <el-icon><InfoFilled /></el-icon> 点击步骤时将在新窗口打开此链接，例如：http://localhost:8088/health
+              </div>
+            </el-form-item>
+            
+            <!-- Only show agent selection for COMMAND type -->
+            <el-row v-if="step.stepType === 'COMMAND'" :gutter="20">
               <el-col :span="12">
                 <el-form-item label="执行代理">
                   <el-select v-model="step.agentId" placeholder="使用告警代理" clearable style="width: 100%">
@@ -181,6 +250,18 @@
               </el-col>
             </el-row>
             
+            <!-- For URL_JUMP, only show dependency selection -->
+            <el-row v-if="step.stepType === 'URL_JUMP'" :gutter="20">
+              <el-col :span="24">
+                <el-form-item label="依赖步骤">
+                  <el-select v-model="step.dependsOnIndex" placeholder="无依赖" style="width: 100%">
+                    <el-option label="无依赖" :value="null" />
+                    <el-option v-for="i in index" :key="i" :label="`步骤 ${i}`" :value="i - 1" />
+                  </el-select>
+                </el-form-item>
+              </el-col>
+            </el-row>
+            
             <el-form-item label="备注">
               <el-input v-model="step.notes" placeholder="额外说明或警告" />
             </el-form-item>
@@ -198,18 +279,31 @@
     <el-dialog 
       v-model="showViewDialog" 
       title="查看知识库" 
-      width="800px"
+      width="1000px"
     >
       <div v-if="viewingKnowledge">
-        <el-descriptions :column="2" border>
+        <el-descriptions :column="2" border size="large">
           <el-descriptions-item label="标题" :span="2">
-            <h3 style="margin: 0; color: #1976d2;">{{ viewingKnowledge.title }}</h3>
+            <h3 style="margin: 0; color: #1976d2;">
+              <el-icon><Reading /></el-icon>
+              {{ viewingKnowledge.title }}
+            </h3>
           </el-descriptions-item>
           <el-descriptions-item label="描述" :span="2" v-if="viewingKnowledge.description">
-            {{ viewingKnowledge.description }}
+            <div style="padding: 8px; background: #f5f7fa; border-radius: 4px;">
+              {{ viewingKnowledge.description }}
+            </div>
           </el-descriptions-item>
-          <el-descriptions-item label="关联规则">
-            {{ getAlertRuleName(viewingKnowledge.alertRuleId) }}
+          <el-descriptions-item label="关联规则" :span="2">
+            <el-tag v-for="ruleId in viewingKnowledge.alertRuleIds" :key="ruleId" size="default" type="primary" style="margin-right: 5px;">
+              {{ getAlertRuleName(ruleId) }}
+            </el-tag>
+            <el-tag v-if="!viewingKnowledge.alertRuleIds || viewingKnowledge.alertRuleIds.length === 0" type="info">未关联</el-tag>
+          </el-descriptions-item>
+          <el-descriptions-item label="步骤总数">
+            <el-tag type="info" size="large">
+              {{ viewingKnowledge.steps ? viewingKnowledge.steps.length : 0 }} 步
+            </el-tag>
           </el-descriptions-item>
           <el-descriptions-item label="更新时间">
             {{ formatTime(viewingKnowledge.updatedAt) }}
@@ -218,36 +312,62 @@
         
         <el-divider content-position="left">
           <el-icon><List /></el-icon>
-          <span>应急操作步骤</span>
+          <span style="font-weight: 600; font-size: 16px;">应急操作步骤</span>
         </el-divider>
         
-        <el-timeline>
-          <el-timeline-item 
-            v-for="(step, index) in viewingKnowledge.steps" 
-            :key="index"
-            :timestamp="`步骤 ${index + 1}`"
-            placement="top"
-          >
-            <el-card shadow="hover">
-              <template #header>
-                <div style="font-weight: 600; color: #1976d2;">{{ step.description }}</div>
-              </template>
-              <div class="command-view">
-                <div class="command-label">执行命令：</div>
-                <pre class="command-text">{{ step.linuxCommand }}</pre>
+        <!-- Steps Table -->
+        <el-table 
+          :data="viewingKnowledge.steps" 
+          stripe 
+          border
+          style="width: 100%"
+          :default-sort="{ prop: 'stepOrder', order: 'ascending' }"
+        >
+          <el-table-column type="index" label="步骤" width="80" :index="(index) => index + 1" />
+          
+          <el-table-column label="类型" width="120">
+            <template #default="scope">
+              <el-tag v-if="scope.row.stepType === 'URL_JUMP'" type="success" size="default">
+                <el-icon><Link /></el-icon> URL跳转
+              </el-tag>
+              <el-tag v-else type="primary" size="default">
+                <el-icon><Reading /></el-icon> 执行命令
+              </el-tag>
+            </template>
+          </el-table-column>
+          
+          <el-table-column label="描述" min-width="200">
+            <template #default="scope">
+              <div style="font-weight: 600; color: #303133;">{{ scope.row.description }}</div>
+              <div v-if="scope.row.notes" style="font-size: 12px; color: #909399; margin-top: 4px;">
+                <el-icon><InfoFilled /></el-icon> {{ scope.row.notes }}
               </div>
-              <el-alert v-if="step.agentId" type="success" :closable="false" style="margin-top: 10px;">
-                执行代理: {{ getAgentName(step.agentId) }}
-              </el-alert>
-              <el-alert v-if="step.dependsOn" type="warning" :closable="false" style="margin-top: 10px;">
-                依赖步骤: 步骤 {{ findStepNumber(viewingKnowledge.steps, step.dependsOn) }}
-              </el-alert>
-              <el-alert v-if="step.notes" type="info" :closable="false" style="margin-top: 10px;">
-                {{ step.notes }}
-              </el-alert>
-            </el-card>
-          </el-timeline-item>
-        </el-timeline>
+            </template>
+          </el-table-column>
+          
+          <el-table-column label="内容" min-width="300">
+            <template #default="scope">
+              <div v-if="scope.row.stepType === 'URL_JUMP'">
+                <el-link :href="scope.row.jumpUrl" target="_blank" :icon="Link" type="success">
+                  {{ scope.row.jumpUrl }}
+                </el-link>
+              </div>
+              <pre v-else class="command-text-view">{{ scope.row.linuxCommand }}</pre>
+            </template>
+          </el-table-column>
+          
+          <el-table-column label="执行代理" width="150">
+            <template #default="scope">
+              <div v-if="scope.row.stepType === 'COMMAND'">
+                <el-tag v-if="scope.row.agentId" size="default" type="success">
+                  {{ getAgentName(scope.row.agentId) }}
+                </el-tag>
+                <el-tag v-else type="info" size="default">告警代理</el-tag>
+              </div>
+              <span v-else style="color: #909399; font-size: 12px;">-</span>
+            </template>
+          </el-table-column>
+        </el-table>
       </div>
       
       <template #footer>
@@ -258,7 +378,7 @@
 </template>
 
 <script>
-import { Reading, Plus, Edit, View, Delete, List, Top, Bottom, Search, Refresh } from '@element-plus/icons-vue'
+import { Reading, Plus, Edit, View, Delete, List, Top, Bottom, Search, Refresh, Link } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
 export default {
@@ -273,7 +393,8 @@ export default {
     Top,
     Bottom,
     Search,
-    RefreshIcon: Refresh
+    RefreshIcon: Refresh,
+    Link
   },
   data() {
     return {
@@ -294,7 +415,7 @@ export default {
       isEditMode: false,
       currentKnowledge: {
         id: null,
-        alertRuleId: null,
+        alertRuleIds: [],
         title: '',
         description: '',
         steps: []
@@ -314,7 +435,7 @@ export default {
       
       if (this.searchForm.alertRuleId) {
         filtered = filtered.filter(item => 
-          item.alertRuleId === this.searchForm.alertRuleId
+          item.alertRuleIds && item.alertRuleIds.includes(this.searchForm.alertRuleId)
         )
       }
       
@@ -328,13 +449,6 @@ export default {
       const end = start + this.pagination.pageSize
       return this.filteredKnowledgeList.slice(start, end)
     },
-    availableAlertRules() {
-      // Filter out alert rules that already have knowledge base
-      const usedRuleIds = this.knowledgeList
-        .filter(k => !this.isEditMode || k.id !== this.currentKnowledge.id)
-        .map(k => k.alertRuleId)
-      return this.alertRules.filter(rule => !usedRuleIds.includes(rule.id))
-    }
   },
   mounted() {
     this.loadData()
@@ -409,12 +523,14 @@ export default {
       this.isEditMode = true
       this.currentKnowledge = {
         id: knowledge.id,
-        alertRuleId: knowledge.alertRuleId,
+        alertRuleIds: knowledge.alertRuleIds ? [...knowledge.alertRuleIds] : [],
         title: knowledge.title,
         description: knowledge.description,
         steps: knowledge.steps.map((step, index) => ({
+          stepType: step.stepType || 'COMMAND',
           description: step.description,
           linuxCommand: step.linuxCommand,
+          jumpUrl: step.jumpUrl,
           agentId: step.agentId || null,
           dependsOnIndex: step.dependsOn ? this.findStepIndex(knowledge.steps, step.dependsOn) : null,
           notes: step.notes || ''
@@ -431,7 +547,7 @@ export default {
     resetCurrentKnowledge() {
       this.currentKnowledge = {
         id: null,
-        alertRuleId: null,
+        alertRuleIds: [],
         title: '',
         description: '',
         steps: []
@@ -440,8 +556,10 @@ export default {
     
     addStep() {
       this.currentKnowledge.steps.push({
+        stepType: 'COMMAND',
         description: '',
         linuxCommand: '',
+        jumpUrl: '',
         agentId: null,
         dependsOnIndex: null,
         notes: ''
@@ -511,8 +629,8 @@ export default {
     },
     
     async saveKnowledge() {
-      if (!this.currentKnowledge.alertRuleId) {
-        ElMessage.warning('请选择关联的告警规则')
+      if (!this.currentKnowledge.alertRuleIds || this.currentKnowledge.alertRuleIds.length === 0) {
+        ElMessage.warning('请选择至少一个关联的告警规则')
         return
       }
       
@@ -524,21 +642,33 @@ export default {
       // Validate steps
       for (let i = 0; i < this.currentKnowledge.steps.length; i++) {
         const step = this.currentKnowledge.steps[i]
-        if (!step.description || !step.linuxCommand) {
-          alert(`步骤 ${i + 1} 的描述和命令不能为空`)
+        if (!step.description) {
+          alert(`步骤 ${i + 1} 的描述不能为空`)
+          return
+        }
+        if (step.stepType === 'COMMAND' && !step.linuxCommand) {
+          alert(`步骤 ${i + 1} 的命令不能为空`)
+          return
+        }
+        if (step.stepType === 'URL_JUMP' && !step.jumpUrl) {
+          alert(`步骤 ${i + 1} 的跳转URL不能为空`)
           return
         }
       }
       
       // Prepare data for backend
       const payload = {
-        alertRuleId: this.currentKnowledge.alertRuleId,
+        id: this.currentKnowledge.id,
+        alertRuleIds: this.currentKnowledge.alertRuleIds,
         title: this.currentKnowledge.title,
         description: this.currentKnowledge.description,
         steps: this.currentKnowledge.steps.map((step, index) => ({
           stepOrder: index + 1,
+          stepType: step.stepType || 'COMMAND',
           description: step.description,
-          linuxCommand: step.linuxCommand,
+          linuxCommand: step.stepType === 'COMMAND' ? step.linuxCommand : null,
+          jumpUrl: step.stepType === 'URL_JUMP' ? step.jumpUrl : null,
+          agentId: step.agentId || null,
           dependsOn: null,
           notes: step.notes
         }))
@@ -688,6 +818,20 @@ export default {
   white-space: pre-wrap;
   word-break: break-all;
   line-height: 1.5;
+}
+
+.command-text-view {
+  background: #f5f5f5;
+  color: #303133;
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+  margin: 0;
+  border: 1px solid #dcdfe6;
+  white-space: pre-wrap;
+  word-break: break-all;
+  line-height: 1.4;
 }
 
 .pagination-container {

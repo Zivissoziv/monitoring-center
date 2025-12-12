@@ -127,6 +127,9 @@
       <div v-if="filteredMetrics.length === 0">
         <el-empty description="暂无符合条件的监控数据" />
       </div>
+      <div v-else-if="individualCharts.length === 0">
+        <el-empty description="当前指标不支持图表显示（仅数值型指标支持图表视图）" />
+      </div>
       <div v-else class="charts-grid">
         <div 
           v-for="(chartData, index) in individualCharts" 
@@ -185,47 +188,54 @@ export default {
       return this.filteredMetrics
     },
     individualCharts() {
-      // Prepare data for individual charts
+      // Prepare data for individual charts - only for NUMERIC metrics
       const charts = []
       
-      if (this.selectedMetricType === 'ALL') {
-        // Create separate charts for CPU and Memory
-        const cpuMetrics = this.filteredMetrics.filter(m => m.metricType === 'CPU')
-        const memoryMetrics = this.filteredMetrics.filter(m => m.metricType === 'MEMORY')
+      // Helper function to check if a metric is numeric
+      const isNumericMetric = (metricName) => {
+        const definition = this.metricDefinitions.find(d => d.metricName === metricName)
+        return definition && definition.metricType === 'NUMERIC'
+      }
+      
+      if (this.searchForm.metricType === '') {
+        // Create separate charts for each numeric metric type
+        const metricTypes = [...new Set(this.filteredMetrics.map(m => m.metricType))]
         
-        if (cpuMetrics.length > 0) {
-          charts.push({
-            type: 'CPU',
-            data: cpuMetrics,
-            title: 'CPU使用率趋势'
-          })
-        }
-        
-        if (memoryMetrics.length > 0) {
-          charts.push({
-            type: 'MEMORY',
-            data: memoryMetrics,
-            title: '内存使用率趋势'
-          })
-        }
-      } else {
-        // Group by agent for the selected metric type
-        const agentIds = [...new Set(this.filteredMetrics.map(m => m.agentId))]
-        agentIds.forEach(agentId => {
-          const agentMetrics = this.filteredMetrics.filter(m => 
-            (!this.searchForm.agentId || m.agentId === this.searchForm.agentId) &&
-            (!this.searchForm.metricType || m.metricType === this.searchForm.metricType)
-          )
-          if (agentMetrics.length > 0) {
-            const metricType = this.searchForm.metricType || agentMetrics[0].metricType
-            charts.push({
-              type: metricType,
-              agentId: agentId,
-              data: agentMetrics,
-              title: `${this.getAgentName(agentId)} - ${this.getMetricTypeName(metricType)}趋势`
-            })
+        metricTypes.forEach(metricType => {
+          // Only create chart if it's a numeric metric
+          if (isNumericMetric(metricType)) {
+            const typeMetrics = this.filteredMetrics.filter(m => m.metricType === metricType)
+            
+            if (typeMetrics.length > 0) {
+              charts.push({
+                type: metricType,
+                data: typeMetrics,
+                title: `${this.getMetricTypeName(metricType)}趋势`
+              })
+            }
           }
         })
+      } else {
+        // Only show chart if the selected metric type is numeric
+        if (isNumericMetric(this.searchForm.metricType)) {
+          // Group by agent for the selected metric type
+          const agentIds = [...new Set(this.filteredMetrics.map(m => m.agentId))]
+          agentIds.forEach(agentId => {
+            const agentMetrics = this.filteredMetrics.filter(m => 
+              (!this.searchForm.agentId || m.agentId === this.searchForm.agentId) &&
+              (!this.searchForm.metricType || m.metricType === this.searchForm.metricType)
+            )
+            if (agentMetrics.length > 0) {
+              const metricType = this.searchForm.metricType || agentMetrics[0].metricType
+              charts.push({
+                type: metricType,
+                agentId: agentId,
+                data: agentMetrics,
+                title: `${this.getAgentName(agentId)} - ${this.getMetricTypeName(metricType)}趋势`
+              })
+            }
+          })
+        }
       }
       
       return charts
@@ -449,6 +459,10 @@ export default {
             try {
               const ctx = canvasRef[0].getContext('2d')
               
+              // Get metric definition for unit info
+              const metricDef = this.metricDefinitions.find(d => d.metricName === chartConfig.type)
+              const unit = metricDef ? metricDef.unit : ''
+              
               // Prepare data for chart - limit to 100 data points for performance
               const maxDataPoints = 100
               let data = chartConfig.data.slice().reverse() // Reverse to show oldest to newest
@@ -514,10 +528,9 @@ export default {
                   scales: {
                     y: {
                       beginAtZero: true,
-                      max: 100,
                       ticks: {
-                        callback: function(value) {
-                          return value + '%'
+                        callback: (value) => {
+                          return value + (unit ? ' ' + unit : '')
                         },
                         color: '#000000',
                         font: {

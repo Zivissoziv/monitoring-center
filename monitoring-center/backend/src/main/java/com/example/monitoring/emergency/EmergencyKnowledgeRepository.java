@@ -7,6 +7,4 @@ import java.util.Optional;
 
 @Repository
 public interface EmergencyKnowledgeRepository extends JpaRepository<EmergencyKnowledge, Long> {
-    Optional<EmergencyKnowledge> findByAlertRuleId(Long alertRuleId);
-    boolean existsByAlertRuleId(Long alertRuleId);
 }

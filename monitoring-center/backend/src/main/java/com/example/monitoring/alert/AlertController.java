@@ -3,7 +3,15 @@ package com.example.monitoring.alert;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
@@ -27,6 +35,7 @@ private AlertService alertService;
             AlertRule alertRule = alertService.getAlertRuleById(id);
             return ResponseEntity.ok(alertRule);
         } catch (RuntimeException e) {
+            log.error("Alert rule {} not found", id, e);
             return ResponseEntity.notFound().build();
         }
     }
@@ -45,6 +54,7 @@ private AlertService alertService;
             AlertRule updatedAlertRule = alertService.updateAlertRule(id, alertRuleDetails);
             return ResponseEntity.ok(updatedAlertRule);
         } catch (RuntimeException e) {
+            log.error("Failed to update alert rule {}: {}", id, e.getMessage(), e);
             return ResponseEntity.notFound().build();
         }
     }
@@ -55,6 +65,7 @@ private AlertService alertService;
             alertService.deleteAlertRule(id);
             return ResponseEntity.noContent().build();
         } catch (RuntimeException e) {
+            log.error("Failed to delete alert rule {}: {}", id, e.getMessage(), e);
             return ResponseEntity.notFound().build();
         }
     }

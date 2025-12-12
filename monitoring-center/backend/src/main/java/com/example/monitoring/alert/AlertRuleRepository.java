@@ -11,4 +11,5 @@ public interface AlertRuleRepository extends JpaRepository<AlertRule, Long> {
     List<AlertRule> findByEnabledTrue();
     List<AlertRule> findByAgentIdAndEnabledTrue(String agentId);
     List<AlertRule> findByMetricTypeAndEnabledTrue(String metricType);
+    List<AlertRule> findByMetricTypeAndEnabled(String metricType, boolean enabled);
 }
