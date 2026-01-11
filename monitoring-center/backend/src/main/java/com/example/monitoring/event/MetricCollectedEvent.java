@@ -1,6 +1,6 @@
 package com.example.monitoring.event;
 
-import com.example.monitoring.metric.Metric;
+import com.example.monitoring.entity.Metric;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;

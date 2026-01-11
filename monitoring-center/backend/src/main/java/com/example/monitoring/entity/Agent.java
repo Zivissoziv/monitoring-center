@@ -1,0 +1,33 @@
+package com.example.monitoring.entity;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import javax.persistence.Column;
+import javax.persistence.Entity;
+import javax.persistence.Id;
+import javax.persistence.Table;
+
+@Entity
+@Table(name = "agents")
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class Agent {
+    @Id
+    @Column(columnDefinition = "VARCHAR(36)")
+    private String id;  // Manually set, should match agent.name from agent config
+    
+    private String name;
+    private String ip;
+    private int port;
+    private String status; // ACTIVE, INACTIVE, DISCONNECTED
+    
+    public Agent(String name, String ip, int port) {
+        this.name = name;
+        this.ip = ip;
+        this.port = port;
+        this.status = "INACTIVE";
+    }
+}

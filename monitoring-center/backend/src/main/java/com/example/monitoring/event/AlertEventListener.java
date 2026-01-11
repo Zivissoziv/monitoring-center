@@ -1,13 +1,13 @@
 package com.example.monitoring.event;
 
-import com.example.monitoring.alert.Alert;
-import com.example.monitoring.alert.AlertRepository;
-import com.example.monitoring.alert.AlertRule;
-import com.example.monitoring.alert.AlertRuleRepository;
-import com.example.monitoring.alert.AlertService;
-import com.example.monitoring.metric.Metric;
-import com.example.monitoring.metric.MetricDefinition;
-import com.example.monitoring.metric.MetricDefinitionRepository;
+import com.example.monitoring.entity.Alert;
+import com.example.monitoring.repository.AlertRepository;
+import com.example.monitoring.entity.AlertRule;
+import com.example.monitoring.repository.AlertRuleRepository;
+import com.example.monitoring.service.AlertService;
+import com.example.monitoring.entity.Metric;
+import com.example.monitoring.entity.MetricDefinition;
+import com.example.monitoring.repository.MetricDefinitionRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.event.EventListener;

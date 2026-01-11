@@ -1,12 +1,12 @@
 package com.example.monitoring.service;
 
-import com.example.monitoring.agent.Agent;
-import com.example.monitoring.agent.AgentRepository;
 import com.example.monitoring.dto.MetricCollectionConfig;
-import com.example.monitoring.metric.AgentMetricConfig;
-import com.example.monitoring.metric.AgentMetricConfigRepository;
-import com.example.monitoring.metric.MetricDefinition;
-import com.example.monitoring.metric.MetricDefinitionRepository;
+import com.example.monitoring.entity.Agent;
+import com.example.monitoring.entity.AgentMetricConfig;
+import com.example.monitoring.entity.MetricDefinition;
+import com.example.monitoring.repository.AgentMetricConfigRepository;
+import com.example.monitoring.repository.AgentRepository;
+import com.example.monitoring.repository.MetricDefinitionRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpEntity;

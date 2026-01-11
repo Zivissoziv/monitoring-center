@@ -1,13 +1,13 @@
 package com.example.monitoring.job;
 
-import com.example.monitoring.alert.Alert;
-import com.example.monitoring.alert.AlertRepository;
-import com.example.monitoring.alert.AlertRule;
-import com.example.monitoring.alert.AlertRuleRepository;
-import com.example.monitoring.metric.Metric;
-import com.example.monitoring.metric.MetricDefinition;
-import com.example.monitoring.metric.MetricDefinitionRepository;
-import com.example.monitoring.metric.MetricRepository;
+import com.example.monitoring.entity.Alert;
+import com.example.monitoring.repository.AlertRepository;
+import com.example.monitoring.entity.AlertRule;
+import com.example.monitoring.repository.AlertRuleRepository;
+import com.example.monitoring.entity.Metric;
+import com.example.monitoring.entity.MetricDefinition;
+import com.example.monitoring.repository.MetricDefinitionRepository;
+import com.example.monitoring.repository.MetricRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.quartz.Job;
 import org.quartz.JobExecutionContext;

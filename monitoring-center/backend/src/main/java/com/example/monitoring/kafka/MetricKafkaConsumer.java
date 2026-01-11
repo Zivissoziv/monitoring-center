@@ -1,8 +1,8 @@
 package com.example.monitoring.kafka;
 
 import com.example.monitoring.dto.MetricData;
-import com.example.monitoring.metric.Metric;
-import com.example.monitoring.metric.MetricService;
+import com.example.monitoring.entity.Metric;
+import com.example.monitoring.service.MetricService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.kafka.annotation.KafkaListener;
