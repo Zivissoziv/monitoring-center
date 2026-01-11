@@ -35,7 +35,18 @@
       <template #header>
         <div class="card-header">
           <span>代理列表</span>
-          <el-button type="primary" @click="showAddDialog" :icon="Plus">添加代理</el-button>
+          <div>
+            <el-button 
+              type="success" 
+              @click="pushConfigToAllAgents" 
+              :icon="Upload"
+              :loading="pushingAll"
+              style="margin-right: 10px"
+            >
+              推送配置到所有代理
+            </el-button>
+            <el-button type="primary" @click="showAddDialog" :icon="Plus">添加代理</el-button>
+          </div>
         </div>
       </template>
       <el-table :data="paginatedAgents" stripe style="width: 100%" v-loading="loading">
@@ -50,8 +61,17 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="150">
+        <el-table-column label="操作" width="280">
           <template #default="scope">
+            <el-button 
+              size="small" 
+              type="primary" 
+              :icon="Upload"
+              @click="pushConfigToAgent(scope.row.id)"
+              :loading="pushingConfig[scope.row.id]"
+            >
+              推送配置
+            </el-button>
             <el-popconfirm 
               title="确定要删除该代理吗？" 
               @confirm="deleteAgent(scope.row.id)"
@@ -91,8 +111,17 @@
       :close-on-click-modal="false"
     >
       <el-form :model="newAgent" label-width="100px" ref="agentForm">
+        <el-form-item label="Agent ID" required>
+          <el-input 
+            v-model="newAgent.id" 
+            placeholder="与agent配置中的agent.name保持一致，如: Server1-Agent" 
+          />
+          <div style="color: #909399; font-size: 12px; margin-top: 5px;">
+            提示：必须与agent配置文件中的agent.name完全一致
+          </div>
+        </el-form-item>
         <el-form-item label="名称" required>
-          <el-input v-model="newAgent.name" placeholder="输入代理名称" />
+          <el-input v-model="newAgent.name" placeholder="输入代理显示名称" />
         </el-form-item>
         <el-form-item label="IP地址" required>
           <el-input v-model="newAgent.ip" placeholder="例如: 192.168.1.100" />
@@ -135,7 +164,7 @@
 </template>
 
 <script>
-import { Monitor, Plus, Delete, Connection, Search, Refresh } from '@element-plus/icons-vue'
+import { Monitor, Plus, Delete, Connection, Search, Refresh, Upload } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 
 export default {
@@ -146,7 +175,8 @@ export default {
     Delete,
     Connection,
     Search,
-    Refresh
+    Refresh,
+    Upload
   },
   data() {
     return {
@@ -155,6 +185,8 @@ export default {
       dialogVisible: false,
       testing: false,
       adding: false,
+      pushingAll: false,
+      pushingConfig: {}, // Track loading state for each agent
       searchForm: {
         name: '',
         ip: '',
@@ -171,6 +203,7 @@ export default {
         success: false
       },
       newAgent: {
+        id: '',
         name: '',
         ip: '',
         port: 8080
@@ -216,7 +249,7 @@ export default {
   methods: {
     showAddDialog() {
       this.dialogVisible = true
-      this.newAgent = { name: '', ip: '', port: 8080 }
+      this.newAgent = { id: '', name: '', ip: '', port: 8080 }
       this.testResult = { show: false, type: 'info', message: '', success: false }
     },
     
@@ -319,7 +352,7 @@ export default {
     },
     
     async addAgent() {
-      if (!this.newAgent.name || !this.newAgent.ip || !this.newAgent.port) {
+      if (!this.newAgent.id || !this.newAgent.name || !this.newAgent.ip || !this.newAgent.port) {
         ElMessage.warning('请填写完整信息')
         return
       }
@@ -340,10 +373,23 @@ export default {
           this.agents.push(agent)
           ElMessage.success('代理添加成功')
           this.dialogVisible = false
-          this.newAgent = { name: '', ip: '', port: 8080 }
+          this.newAgent = { id: '', name: '', ip: '', port: 8080 }
           this.testResult = { show: false, type: 'info', message: '', success: false }
+          
           // Reload agents to get updated data
           await this.loadAgents()
+          
+          // Auto push configuration to the new agent
+          ElMessage.info('正在推送采集配置到新代理...')
+          try {
+            await fetch(`/api/agents/${agent.id}/push-config`, {
+              method: 'POST'
+            })
+            ElMessage.success('采集配置已推送到代理')
+          } catch (error) {
+            console.error('Error pushing config to new agent:', error)
+            ElMessage.warning('配置推送失败，请手动点击“推送配置”按钮')
+          }
         } else {
           const errorText = await response.text()
           console.error('Add agent failed:', response.status, errorText)
@@ -391,6 +437,50 @@ export default {
         'DISCONNECTED': 'danger'
       }
       return typeMap[status] || 'info'
+    },
+    
+    async pushConfigToAgent(agentId) {
+      this.$set(this.pushingConfig, agentId, true)
+      
+      try {
+        const response = await fetch(`/api/agents/${agentId}/push-config`, {
+          method: 'POST'
+        })
+        
+        if (response.ok) {
+          ElMessage.success('配置推送成功')
+        } else {
+          const errorText = await response.text()
+          ElMessage.error(`配置推送失败: ${errorText}`)
+        }
+      } catch (error) {
+        console.error('Error pushing config:', error)
+        ElMessage.error('配置推送失败: ' + error.message)
+      } finally {
+        this.$set(this.pushingConfig, agentId, false)
+      }
+    },
+    
+    async pushConfigToAllAgents() {
+      this.pushingAll = true
+      
+      try {
+        const response = await fetch('/api/agents/push-config-all', {
+          method: 'POST'
+        })
+        
+        if (response.ok) {
+          ElMessage.success('配置已推送到所有代理')
+        } else {
+          const errorText = await response.text()
+          ElMessage.error(`配置推送失败: ${errorText}`)
+        }
+      } catch (error) {
+        console.error('Error pushing config to all agents:', error)
+        ElMessage.error('配置推送失败: ' + error.message)
+      } finally {
+        this.pushingAll = false
+      }
     }
   }
 }

@@ -1,5 +1,6 @@
 package com.example.monitoring.agent;
 
+import com.example.monitoring.service.AgentConfigService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -25,6 +26,9 @@ public class AgentController {
     
     @Autowired
     private AgentService agentService;
+    
+    @Autowired
+    private AgentConfigService agentConfigService;
     
     @GetMapping
     public List<Agent> getAllAgents() {
@@ -155,6 +159,32 @@ public class AgentController {
         } catch (RuntimeException e) {
             log.error("Failed to execute command on agent {}: {}", id, e.getMessage(), e);
             return ResponseEntity.notFound().build();
+        }
+    }
+    
+    // Push metric collection configuration to agent
+    @PostMapping("/{id}/push-config")
+    public ResponseEntity<String> pushConfigToAgent(@PathVariable String id) {
+        try {
+            log.info("Pushing config to agent: {}", id);
+            agentConfigService.pushConfigToAgent(id);
+            return ResponseEntity.ok("Configuration pushed successfully");
+        } catch (Exception e) {
+            log.error("Failed to push config to agent {}: {}", id, e.getMessage(), e);
+            return ResponseEntity.internalServerError().body("Failed to push configuration: " + e.getMessage());
+        }
+    }
+    
+    // Push metric collection configuration to all agents
+    @PostMapping("/push-config-all")
+    public ResponseEntity<String> pushConfigToAllAgents() {
+        try {
+            log.info("Pushing config to all agents");
+            agentConfigService.pushConfigToAllAgents();
+            return ResponseEntity.ok("Configuration pushed to all agents");
+        } catch (Exception e) {
+            log.error("Failed to push config to all agents: {}", e.getMessage(), e);
+            return ResponseEntity.internalServerError().body("Failed to push configuration: " + e.getMessage());
         }
     }
 }

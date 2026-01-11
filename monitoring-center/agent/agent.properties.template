@@ -7,6 +7,11 @@ agent.port=8081
 
 # Port for agent HTTP server
 
-# Metric Collection Configuration
-# How often to collect and send metrics (in seconds)
-metric.interval.seconds=10
+# Kafka Configuration
+# Kafka bootstrap servers (comma-separated host:port)
+# Must match the Kafka cluster that backend is consuming from
+spring.kafka.bootstrap-servers=192.168.44.20:9092
+
+# Optional: Kafka producer serialization (usually keep default)
+#spring.kafka.producer.key-serializer=org.apache.kafka.common.serialization.StringSerializer
+#spring.kafka.producer.value-serializer=org.springframework.kafka.support.serializer.JsonSerializer

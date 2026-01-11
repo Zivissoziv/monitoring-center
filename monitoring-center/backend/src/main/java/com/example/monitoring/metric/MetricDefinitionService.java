@@ -46,7 +46,7 @@ public class MetricDefinitionService {
         MetricDefinition saved = metricDefinitionRepository.save(definition);
         
         // Auto-create configs for all existing agents if metric is enabled
-        if (saved.isEnabled()) {
+        if (saved.getEnabled()) {
             initializeConfigsForAllAgents(saved.getMetricName());
         }
         
@@ -57,7 +57,7 @@ public class MetricDefinitionService {
         MetricDefinition definition = metricDefinitionRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Metric definition not found with id: " + id));
         
-        boolean wasDisabled = !definition.isEnabled();
+        boolean wasDisabled = !definition.getEnabled();
         
         definition.setMetricName(definitionDetails.getMetricName());
         definition.setDisplayName(definitionDetails.getDisplayName());
@@ -66,13 +66,13 @@ public class MetricDefinitionService {
         definition.setCollectionInterval(definitionDetails.getCollectionInterval());
         definition.setProcessingRule(definitionDetails.getProcessingRule());
         definition.setUnit(definitionDetails.getUnit());
-        definition.setEnabled(definitionDetails.isEnabled());
+        definition.setEnabled(definitionDetails.getEnabled());
         definition.setUpdatedAt(System.currentTimeMillis());
         
         MetricDefinition saved = metricDefinitionRepository.save(definition);
         
         // If metric was just enabled, create configs for agents that don't have it
-        if (wasDisabled && saved.isEnabled()) {
+        if (wasDisabled && saved.getEnabled()) {
             initializeConfigsForAllAgents(saved.getMetricName());
         }
         

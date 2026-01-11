@@ -122,7 +122,7 @@ public class AgentService {
                 MetricDefinition definition = metricDefinitionService.getDefinitionByName(config.getMetricName())
                         .orElse(null);
                 
-                if (definition == null || !definition.isEnabled()) {
+                if (definition == null || !definition.getEnabled()) {
                     continue;
                 }
                 

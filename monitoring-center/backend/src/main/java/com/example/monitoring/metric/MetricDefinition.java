@@ -47,7 +47,7 @@ public class MetricDefinition {
     private String unit = "%"; // Unit of measurement (%, MB, count, etc.)
     
     @Column(name = "enabled")
-    private boolean enabled = true;
+    private Boolean enabled = true;
     
     @Column(name = "created_at")
     private long createdAt;
