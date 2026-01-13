@@ -47,6 +47,9 @@ public class Alert {
     private String resolveNote;
     private Long resolvedAt;
     
+    @Column(name = "external_alert_id")
+    private String externalAlertId; // 第三方告警的外部ID
+    
     // Constructor for numeric alerts
     public Alert(Long alertRuleId, String agentId, String ruleName, String metricType, 
                  double triggerValue, double threshold, String severity) {

@@ -59,10 +59,11 @@
         
         <el-form-item label="严重程度">
           <el-select v-model="alertFilters.severity" placeholder="全部" clearable style="width: 120px">
-            <el-option label="低" value="LOW" />
-            <el-option label="中" value="MEDIUM" />
-            <el-option label="高" value="HIGH" />
-            <el-option label="严重" value="CRITICAL" />
+            <el-option label="通知" value="通知" />
+            <el-option label="提醒" value="提醒" />
+            <el-option label="一般" value="一般" />
+            <el-option label="重要" value="重要" />
+            <el-option label="致命" value="致命" />
           </el-select>
         </el-form-item>
         
@@ -100,12 +101,9 @@
         <el-table-column prop="id" label="ID" width="80" />
         <el-table-column label="告警信息" min-width="250">
           <template #default="scope">
-            <div v-if="scope.row.alertMessage" style="color: #606266; font-weight: 500;">
+            <div style="color: #606266; font-weight: 500;">
               <el-icon style="margin-right: 5px; color: #f56c6c;"><InfoFilled /></el-icon>
-              {{ scope.row.alertMessage }}
-            </div>
-            <div v-else style="color: #909399; font-style: italic;">
-              {{ scope.row.ruleName }}
+              {{ getDisplayAlertMessage(scope.row) || scope.row.ruleName }}
             </div>
           </template>
         </el-table-column>
@@ -116,9 +114,9 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="代理IP" min-width="150">
+        <el-table-column label="来源渠道" min-width="150">
           <template #default="scope">
-            {{ getAgentIp(scope.row.agentId) }}
+            {{ getAlertSource(scope.row) || '-' }}
           </template>
         </el-table-column>
         <el-table-column label="严重程度" width="120">
@@ -190,13 +188,18 @@
                 {{ getMetricTypeName(selectedAlert.metricType) }}
               </el-tag>
             </el-descriptions-item>
-            <el-descriptions-item label="告警信息" :span="2" v-if="selectedAlert.alertMessage">
+            <el-descriptions-item label="外部ID" v-if="selectedAlert.externalAlertId" :span="2">
+              <el-tag type="info" size="small">{{ selectedAlert.externalAlertId }}</el-tag>
+            </el-descriptions-item>
+            <el-descriptions-item label="告警信息" :span="2">
               <div style="color: #606266; padding: 8px; background: #f5f7fa; border-radius: 4px;">
                 <el-icon style="margin-right: 5px; color: #f56c6c;"><InfoFilled /></el-icon>
-                {{ selectedAlert.alertMessage }}
+                {{ getDisplayAlertMessage(selectedAlert) || selectedAlert.ruleName }}
               </div>
             </el-descriptions-item>
-            <el-descriptions-item label="代理IP">{{ getAgentIp(selectedAlert.agentId) }}</el-descriptions-item>
+            <el-descriptions-item label="来源渠道">
+              {{ getAlertSource(selectedAlert) || '-' }}
+            </el-descriptions-item>
             <el-descriptions-item label="触发值">
               {{ formatAlertValue(selectedAlert) }}
             </el-descriptions-item>
@@ -378,16 +381,68 @@
         <el-card class="mb-3" shadow="hover">
           <template #header>
             <div style="display: flex; justify-content: space-between; align-items: center;">
-              <span style="font-weight: 600; color: #1976d2;">监控指标视图</span>
-              <el-radio-group v-model="metricViewMode" size="small" :disabled="isChartViewDisabled">
+              <span style="font-weight: 600; color: #1976d2;">
+                {{ selectedAlert.metricType === 'THIRD_PARTY' ? '第三方告警推送记录' : '监控指标视图' }}
+              </span>
+              <el-radio-group 
+                v-if="selectedAlert.metricType !== 'THIRD_PARTY'"
+                v-model="metricViewMode" 
+                size="small" 
+                :disabled="isChartViewDisabled"
+              >
                 <el-radio-button label="chart" :disabled="isChartViewDisabled">图表视图</el-radio-button>
                 <el-radio-button label="table">表格视图</el-radio-button>
               </el-radio-group>
             </div>
           </template>
           
+          <!-- Third Party Alert Records -->
+          <div v-if="selectedAlert.metricType === 'THIRD_PARTY'">
+            <el-table :data="thirdPartyAlertRecords" stripe style="width: 100%" size="small" v-loading="loadingThirdPartyRecords">
+              <el-table-column label="接收时间" min-width="180">
+                <template #default="scope">
+                  {{ formatTime(scope.row.receivedTime) }}
+                </template>
+              </el-table-column>
+              <el-table-column label="告警内容" min-width="300">
+                <template #default="scope">
+                  {{ scope.row.alertContent }}
+                </template>
+              </el-table-column>
+              <el-table-column label="状态" width="100">
+                <template #default="scope">
+                  <el-tag :type="scope.row.alertStatus === 'OPEN' ? 'danger' : 'success'" size="small">
+                    {{ scope.row.alertStatus === 'OPEN' ? '打开' : '关闭' }}
+                  </el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column label="等级" width="100">
+                <template #default="scope">
+                  <el-tag :type="getSeverityType(scope.row.severity)" size="small">
+                    {{ getSeverityText(scope.row.severity) }}
+                  </el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column label="推送状态" width="100">
+                <template #default="scope">
+                  <el-tag :type="scope.row.pushStatus === 'SUCCESS' ? 'success' : 'danger'" size="small">
+                    {{ scope.row.pushStatus === 'SUCCESS' ? '成功' : '失败' }}
+                  </el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column label="来源IP" width="120">
+                <template #default="scope">
+                  {{ scope.row.sourceIp || '-' }}
+                </template>
+              </el-table-column>
+              <template #empty>
+                <el-empty description="暂无推送记录" :image-size="60" />
+              </template>
+            </el-table>
+          </div>
+          
           <!-- Chart View -->
-          <div v-if="metricViewMode === 'chart' && !isChartViewDisabled" style="height:300px">
+          <div v-if="selectedAlert.metricType !== 'THIRD_PARTY' && metricViewMode === 'chart' && !isChartViewDisabled" style="height:300px">
             <div style="display:flex;justify-content:flex-end;margin-bottom:10px">
               <el-button size="small" @click="refreshChart">刷新图表</el-button>
             </div>
@@ -395,12 +450,12 @@
           </div>
           
           <!-- Disabled Chart View Message -->
-          <div v-if="metricViewMode === 'chart' && isChartViewDisabled" style="padding: 40px; text-align: center;">
+          <div v-if="selectedAlert.metricType !== 'THIRD_PARTY' && metricViewMode === 'chart' && isChartViewDisabled" style="padding: 40px; text-align: center;">
             <el-empty description="布尔类型指标不支持图表视图，请使用表格视图" :image-size="100" />
           </div>
           
           <!-- Table View -->
-          <div v-if="metricViewMode === 'table'">
+          <div v-if="selectedAlert.metricType !== 'THIRD_PARTY' && metricViewMode === 'table'">
             <el-table :data="paginatedMetrics" stripe style="width: 100%" size="small">
               <el-table-column label="时间" min-width="180">
                 <template #default="scope">
@@ -575,6 +630,8 @@ export default {
     const executingCommand = ref('') // Track which command is being executed
     const stepResults = ref({}) // Store results for each step
     const stepResultTab = ref({}) // Track active tab for each step result
+    const thirdPartyAlertRecords = ref([]) // Third party alert push records
+    const loadingThirdPartyRecords = ref(false) // Loading state for third party records
     
     // Computed properties
     const activeAlertsCount = computed(() => {
@@ -867,6 +924,30 @@ export default {
       loadMetricsForAlert()
     }
     
+    const loadThirdPartyAlertRecords = async () => {
+      if (!selectedAlert.value || !selectedAlert.value.externalAlertId) {
+        console.warn('No external alert ID found for this alert')
+        thirdPartyAlertRecords.value = []
+        return
+      }
+      
+      loadingThirdPartyRecords.value = true
+      try {
+        const response = await fetch(`/api/third-party-alerts/external/${selectedAlert.value.externalAlertId}`)
+        if (response.ok) {
+          thirdPartyAlertRecords.value = await response.json()
+        } else {
+          console.error('Failed to load third party alert records:', response.statusText)
+          thirdPartyAlertRecords.value = []
+        }
+      } catch (error) {
+        console.error('Error loading third party alert records:', error)
+        thirdPartyAlertRecords.value = []
+      } finally {
+        loadingThirdPartyRecords.value = false
+      }
+    }
+    
     const handleSizeChange = (newSize) => {
       itemsPerPage.value = newSize
       currentPage.value = 1 // Reset to first page
@@ -1033,6 +1114,32 @@ export default {
       return agent ? agent.ip : 'Unknown'
     }
     
+    const getAlertSource = (alert) => {
+      // 如果是第三方告警（metricType为THIRD_PARTY），显示渠道名称
+      if (alert.metricType === 'THIRD_PARTY') {
+        return alert.ruleName.replace('[\u7b2c\u4e09\u65b9] ', '') || alert.agentId
+      }
+      // 否则显示代理IP，如果没有代理则返回空
+      const agent = agents.value.find(a => a.id === alert.agentId)
+      return agent ? agent.ip : ''
+    }
+    
+    const getDisplayAlertMessage = (alert) => {
+      if (!alert.alertMessage) return ''
+      
+      // 如果是第三方告警，移除消息中的渠道信息和外部ID
+      if (alert.metricType === 'THIRD_PARTY') {
+        const lines = alert.alertMessage.split('\n')
+        // 过滤掉“来自渠道 [xxx] 的第三方告警”和“外部ID: xxx”
+        const filteredLines = lines.filter(line => 
+          !line.includes('来自渠道') && !line.includes('外部ID')
+        )
+        return filteredLines.join('\n').trim()
+      }
+      
+      return alert.alertMessage
+    }
+    
     const getAgentName = (agentId) => {
       const agent = agents.value.find(a => a.id === agentId)
       return agent ? `${agent.name} (${agent.ip})` : '未知代理'
@@ -1048,20 +1155,36 @@ export default {
     
     const getSeverityText = (severity) => {
       const severityMap = {
-        'LOW': '低',
-        'MEDIUM': '中',
-        'HIGH': '高',
-        'CRITICAL': '严重'
+        '通知': '通知',
+        '提醒': '提醒',
+        '一般': '一般',
+        '重要': '重要',
+        '致命': '致命',
+        // 兼容旧值
+        'LOW': '通知',
+        'MEDIUM': '一般',
+        'HIGH': '重要',
+        'CRITICAL': '致命',
+        'INFO': '通知',
+        'WARNING': '提醒'
       }
       return severityMap[severity] || severity
     }
     
     const getSeverityType = (severity) => {
       const typeMap = {
-        'LOW': 'success',
+        '通知': 'info',
+        '提醒': 'warning',
+        '一般': 'warning',
+        '重要': 'danger',
+        '致命': 'danger',
+        // 兼容旧值
+        'LOW': 'info',
         'MEDIUM': 'warning',
-        'HIGH': 'warning',
-        'CRITICAL': 'danger'
+        'HIGH': 'danger',
+        'CRITICAL': 'danger',
+        'INFO': 'info',
+        'WARNING': 'warning'
       }
       return typeMap[severity] || 'info'
     }
@@ -1179,7 +1302,12 @@ export default {
       
       // Add a small delay to ensure the drawer is fully opened before loading data
       setTimeout(() => {
-        loadMetricsForAlert()
+        // 如果是第三方告警，加载推送记录；否则加载指标数据
+        if (alert.metricType === 'THIRD_PARTY') {
+          loadThirdPartyAlertRecords()
+        } else {
+          loadMetricsForAlert()
+        }
       }, 100)
     }
     
@@ -1187,6 +1315,7 @@ export default {
       isEmergencyDrawerOpen.value = false
       selectedAlert.value = null
       metricsForSelectedAlert.value = []
+      thirdPartyAlertRecords.value = [] // Clear third party records
       currentPage.value = 1
       totalMetrics.value = 0
       activeTab.value = 'output' // Reset tab
@@ -1398,6 +1527,8 @@ export default {
       executingCommand, // Add executingCommand to returned values
       stepResults, // Add stepResults to returned values
       stepResultTab, // Add stepResultTab to returned values
+      thirdPartyAlertRecords, // Add thirdPartyAlertRecords to returned values
+      loadingThirdPartyRecords, // Add loadingThirdPartyRecords to returned values
       
       // Computed properties
       activeAlertsCount,
@@ -1413,6 +1544,8 @@ export default {
       
       // Methods
       getAgentIp,
+      getAlertSource,
+      getDisplayAlertMessage,
       getSeverityType,
       getStatusText,
       getStatusType,
@@ -1429,6 +1562,7 @@ export default {
       openEmergencyDrawer,
       closeEmergencyDrawer,
       loadMetricsForAlert,
+      loadThirdPartyAlertRecords, // Add loadThirdPartyAlertRecords to returned values
       handlePageChange,
       handleSizeChange,
       renderChart,

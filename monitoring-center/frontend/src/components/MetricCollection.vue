@@ -463,18 +463,31 @@ export default {
               const metricDef = this.metricDefinitions.find(d => d.metricName === chartConfig.type)
               const unit = metricDef ? metricDef.unit : ''
               
-              // Prepare data for chart - limit to 100 data points for performance
-              const maxDataPoints = 100
+              // Prepare data for chart - limit to 200 data points for better visibility
+              const maxDataPoints = 200
               let data = chartConfig.data.slice().reverse() // Reverse to show oldest to newest
               
-              // Sample data if there are too many points
+              // Sample data if there are too many points (use smart sampling)
               if (data.length > maxDataPoints) {
-                const step = Math.ceil(data.length / maxDataPoints)
-                data = data.filter((_, i) => i % step === 0)
+                const step = Math.floor(data.length / maxDataPoints)
+                data = data.filter((_, i) => i % step === 0).slice(0, maxDataPoints)
               }
               
               const labels = data.map(m => this.formatTimeShort(m.timestamp))
               const values = data.map(m => m.value)
+              
+              // Dynamic color based on metric type
+              const getMetricColor = (type) => {
+                const colors = {
+                  'CPU': { border: '#FF6B6B', bg: 'rgba(255, 107, 107, 0.15)' },
+                  'MEMORY': { border: '#4ECDC4', bg: 'rgba(78, 205, 196, 0.15)' },
+                  'DISK': { border: '#95E1D3', bg: 'rgba(149, 225, 211, 0.15)' },
+                  'NETWORK': { border: '#F38181', bg: 'rgba(243, 129, 129, 0.15)' }
+                }
+                return colors[type] || { border: '#5B8FF9', bg: 'rgba(91, 143, 249, 0.15)' }
+              }
+              
+              const colors = getMetricColor(chartConfig.type)
               
               const chartInstance = new Chart(ctx, {
                 type: 'line',
@@ -483,46 +496,86 @@ export default {
                   datasets: [{
                     label: chartConfig.title,
                     data: values,
-                    borderColor: chartConfig.type === 'CPU' ? '#c62828' : '#1976d2',
-                    backgroundColor: chartConfig.type === 'CPU' ? 'rgba(198, 40, 40, 0.1)' : 'rgba(25, 118, 210, 0.1)',
-                    borderWidth: 2,
-                    tension: 0.4,
-                    pointRadius: data.length > 50 ? 0 : 2,
-                    pointHoverRadius: 4
+                    borderColor: colors.border,
+                    backgroundColor: colors.bg,
+                    borderWidth: 2.5,
+                    tension: 0.35,
+                    pointRadius: data.length > 100 ? 2 : 3,
+                    pointHoverRadius: 6,
+                    pointBackgroundColor: colors.border,
+                    pointBorderColor: '#fff',
+                    pointBorderWidth: 1.5,
+                    pointHoverBorderWidth: 2,
+                    fill: true
                   }]
                 },
                 options: {
                   responsive: true,
                   maintainAspectRatio: false,
+                  interaction: {
+                    mode: 'index',
+                    intersect: false
+                  },
                   plugins: {
                     title: {
                       display: true,
                       text: chartConfig.title,
                       font: {
-                        size: 16,
-                        weight: 'bold'
+                        size: 18,
+                        weight: 'bold',
+                        family: "'Helvetica Neue', 'Arial', sans-serif"
                       },
-                      color: '#1976d2'
+                      color: '#2C3E50',
+                      padding: {
+                        top: 10,
+                        bottom: 20
+                      }
                     },
                     legend: {
                       display: true,
                       position: 'top',
+                      align: 'end',
                       labels: {
-                        color: '#000000',
+                        color: '#2C3E50',
                         font: {
-                          size: 12,
+                          size: 13,
                           weight: '600'
-                        }
+                        },
+                        padding: 15,
+                        usePointStyle: true,
+                        pointStyle: 'circle'
                       }
                     },
                     tooltip: {
+                      enabled: true,
                       mode: 'index',
                       intersect: false,
-                      backgroundColor: 'rgba(0, 0, 0, 0.8)',
-                      titleColor: '#ffffff',
-                      bodyColor: '#ffffff',
-                      borderColor: '#1976d2',
-                      borderWidth: 1
+                      backgroundColor: 'rgba(44, 62, 80, 0.95)',
+                      titleColor: '#ECF0F1',
+                      bodyColor: '#ECF0F1',
+                      borderColor: colors.border,
+                      borderWidth: 2,
+                      padding: 12,
+                      titleFont: {
+                        size: 14,
+                        weight: 'bold'
+                      },
+                      bodyFont: {
+                        size: 13
+                      },
+                      displayColors: true,
+                      callbacks: {
+                        label: function(context) {
+                          let label = context.dataset.label || ''
+                          if (label) {
+                            label += ': '
+                          }
+                          if (context.parsed.y !== null) {
+                            label += context.parsed.y.toFixed(2) + (unit ? ' ' + unit : '')
+                          }
+                          return label
+                        }
+                      }
                     }
                   },
                   scales: {
@@ -530,30 +583,50 @@ export default {
                       beginAtZero: true,
                       ticks: {
                         callback: (value) => {
-                          return value + (unit ? ' ' + unit : '')
+                          return value.toFixed(1) + (unit ? ' ' + unit : '')
                         },
-                        color: '#000000',
+                        color: '#34495E',
                         font: {
-                          weight: '600'
-                        }
+                          size: 12,
+                          weight: '500'
+                        },
+                        padding: 8
                       },
                       grid: {
-                        color: 'rgba(0, 0, 0, 0.1)'
+                        color: 'rgba(149, 165, 166, 0.2)',
+                        lineWidth: 1,
+                        drawBorder: false
+                      },
+                      border: {
+                        display: false
                       }
                     },
                     x: {
                       ticks: {
-                        color: '#000000',
+                        color: '#34495E',
                         font: {
-                          weight: '600'
+                          size: 11,
+                          weight: '500'
                         },
-                        maxTicksLimit: 15,
+                        maxTicksLimit: 20,
                         maxRotation: 45,
-                        minRotation: 45
+                        minRotation: 30,
+                        autoSkip: true,
+                        autoSkipPadding: 10
                       },
                       grid: {
-                        color: 'rgba(0, 0, 0, 0.1)'
+                        color: 'rgba(149, 165, 166, 0.15)',
+                        lineWidth: 1,
+                        drawBorder: false
+                      },
+                      border: {
+                        display: false
                       }
+                    }
+                  },
+                  elements: {
+                    line: {
+                      borderJoinStyle: 'round'
                     }
                   }
                 }
@@ -646,21 +719,29 @@ export default {
 
 .charts-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
-  gap: 20px;
+  grid-template-columns: repeat(auto-fit, minmax(600px, 1fr));
+  gap: 24px;
   margin-top: 20px;
 }
 
 .chart-item {
-  background: #f9f9f9;
-  border-radius: 8px;
-  padding: 15px;
-  min-height: 350px;
+  background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+  border-radius: 12px;
+  padding: 20px;
+  min-height: 400px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  transition: all 0.3s ease;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.chart-item:hover {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  transform: translateY(-2px);
 }
 
 .chart-container {
   position: relative;
-  height: 320px;
+  height: 360px;
   width: 100%;
 }
 

@@ -35,6 +35,10 @@
             <el-icon><Reading /></el-icon>
             <span>应急知识库</span>
           </el-menu-item>
+          <el-menu-item index="third-party">
+            <el-icon><Connection /></el-icon>
+            <span>第三方告警</span>
+          </el-menu-item>
         </el-menu>
       </div>
     </el-header>
@@ -46,18 +50,20 @@
       <MetricDefinitions v-if="activeTab === 'metric-definitions'" />
       <AlertManagement v-if="activeTab === 'alerts'" />
       <EmergencyKnowledge v-if="activeTab === 'emergency'" />
+      <ThirdPartyAlerts v-if="activeTab === 'third-party'" />
     </el-main>
   </el-container>
 </template>
 
 <script>
-import { Monitor, DataBoard, TrendCharts, Bell, Reading, Setting } from '@element-plus/icons-vue'
+import { Monitor, DataBoard, TrendCharts, Bell, Reading, Setting, Connection } from '@element-plus/icons-vue'
 import AgentManagement from './components/AgentManagement.vue'
 import MetricCollection from './components/MetricCollection.vue'
 import MetricDefinitions from './components/MetricDefinitions.vue'
 import AlertManagement from './components/AlertManagement.vue'
 import MonitoringDashboard from './components/MonitoringDashboard.vue'
 import EmergencyKnowledge from './components/EmergencyKnowledge.vue'
+import ThirdPartyAlerts from './components/ThirdPartyAlerts.vue'
 
 export default {
   name: 'App',
@@ -68,12 +74,14 @@ export default {
     Bell,
     Reading,
     Setting,
+    Connection,
     MonitoringDashboard,
     AgentManagement,
     MetricCollection,
     MetricDefinitions,
     AlertManagement,
-    EmergencyKnowledge
+    EmergencyKnowledge,
+    ThirdPartyAlerts
   },
   data() {
     return {
