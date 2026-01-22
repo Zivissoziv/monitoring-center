@@ -1,11 +1,14 @@
 package com.example.monitoring.entity;
 
+import com.example.monitoring.enums.StepType;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import javax.persistence.Column;
 import javax.persistence.Entity;
+import javax.persistence.EnumType;
+import javax.persistence.Enumerated;
 import javax.persistence.GeneratedValue;
 import javax.persistence.GenerationType;
 import javax.persistence.Id;
@@ -27,8 +30,9 @@ public class EmergencyStep {
     @Column(name = "step_order")
     private int stepOrder; // Execution order of the step
     
+    @Enumerated(EnumType.STRING)
     @Column(name = "step_type", length = 20)
-    private String stepType; // COMMAND or URL_JUMP
+    private StepType stepType; // COMMAND or URL_JUMP
     
     private String description; // Description of the step
     
@@ -51,5 +55,6 @@ public class EmergencyStep {
         this.stepOrder = stepOrder;
         this.description = description;
         this.linuxCommand = linuxCommand;
+        this.stepType = StepType.COMMAND;
     }
 }

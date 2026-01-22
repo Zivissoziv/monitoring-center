@@ -310,7 +310,7 @@ export default {
 
     async loadChannels() {
       try {
-        const response = await fetch('/api/third-party-alerts/channels')
+        const response = await fetch('/api/alert-channels')
         this.channels = await response.json()
       } catch (error) {
         console.error('Error loading channels:', error)
@@ -356,8 +356,8 @@ export default {
 
       try {
         const url = this.isEdit
-          ? `/api/third-party-alerts/channels/${this.channelForm.id}`
-          : '/api/third-party-alerts/channels'
+          ? `/api/alert-channels/${this.channelForm.id}`
+          : '/api/alert-channels'
         const method = this.isEdit ? 'PUT' : 'POST'
 
         const response = await fetch(url, {
@@ -386,7 +386,7 @@ export default {
 
     async updateChannelStatus(channel) {
       try {
-        const response = await fetch(`/api/third-party-alerts/channels/${channel.id}`, {
+        const response = await fetch(`/api/alert-channels/${channel.id}`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json'
@@ -416,7 +416,7 @@ export default {
           type: 'warning'
         })
 
-        const response = await fetch(`/api/third-party-alerts/channels/${channel.id}`, {
+        const response = await fetch(`/api/alert-channels/${channel.id}`, {
           method: 'DELETE'
         })
 
@@ -437,7 +437,9 @@ export default {
 
     formatTime(timestamp) {
       if (!timestamp) return '-'
-      return new Date(timestamp).toLocaleString('zh-CN')
+      // Handle both ISO string and milliseconds
+      const date = typeof timestamp === 'string' ? new Date(timestamp) : new Date(timestamp)
+      return date.toLocaleString('zh-CN')
     },
 
     showMockDialog() {

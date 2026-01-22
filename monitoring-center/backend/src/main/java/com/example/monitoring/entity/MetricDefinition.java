@@ -1,14 +1,18 @@
 package com.example.monitoring.entity;
 
+import com.example.monitoring.enums.MetricValueType;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import javax.persistence.Column;
 import javax.persistence.Entity;
+import javax.persistence.EnumType;
+import javax.persistence.Enumerated;
 import javax.persistence.GeneratedValue;
 import javax.persistence.GenerationType;
 import javax.persistence.Id;
 import javax.persistence.Table;
+import java.time.LocalDateTime;
 
 /**
  * Custom metric definition with collection command and processing rules
@@ -31,8 +35,9 @@ public class MetricDefinition {
     @Column(length = 2000)
     private String description; // Description of the metric
     
-    @Column(name = "metric_type")
-    private String metricType = "NUMERIC"; // NUMERIC, BOOLEAN, STRING
+    @Enumerated(EnumType.STRING)
+    @Column(name = "metric_type", length = 20)
+    private MetricValueType metricType = MetricValueType.NUMERIC; // NUMERIC, BOOLEAN, STRING
     
     @Column(name = "collection_command", length = 2000, nullable = false)
     private String collectionCommand; // Shell command to collect metric
@@ -50,16 +55,16 @@ public class MetricDefinition {
     private Boolean enabled = true;
     
     @Column(name = "created_at")
-    private long createdAt;
+    private LocalDateTime createdAt;
     
     @Column(name = "updated_at")
-    private long updatedAt;
+    private LocalDateTime updatedAt;
     
     public MetricDefinition(String metricName, String displayName, String collectionCommand) {
         this.metricName = metricName;
         this.displayName = displayName;
         this.collectionCommand = collectionCommand;
-        this.createdAt = System.currentTimeMillis();
-        this.updatedAt = System.currentTimeMillis();
+        this.createdAt = LocalDateTime.now();
+        this.updatedAt = LocalDateTime.now();
     }
 }

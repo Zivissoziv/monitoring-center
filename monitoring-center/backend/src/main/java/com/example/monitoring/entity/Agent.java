@@ -1,13 +1,17 @@
 package com.example.monitoring.entity;
 
+import com.example.monitoring.enums.AgentStatus;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import javax.persistence.Column;
 import javax.persistence.Entity;
+import javax.persistence.EnumType;
+import javax.persistence.Enumerated;
 import javax.persistence.Id;
 import javax.persistence.Table;
+import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "agents")
@@ -22,12 +26,23 @@ public class Agent {
     private String name;
     private String ip;
     private int port;
-    private String status; // ACTIVE, INACTIVE, DISCONNECTED
+    
+    @Enumerated(EnumType.STRING)
+    @Column(length = 20)
+    private AgentStatus status;
+    
+    @Column(name = "created_at")
+    private LocalDateTime createdAt;
+    
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
     
     public Agent(String name, String ip, int port) {
         this.name = name;
         this.ip = ip;
         this.port = port;
-        this.status = "INACTIVE";
+        this.status = AgentStatus.INACTIVE;
+        this.createdAt = LocalDateTime.now();
+        this.updatedAt = LocalDateTime.now();
     }
 }

@@ -5,6 +5,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import javax.persistence.*;
+import java.time.LocalDateTime;
 
 /**
  * 第三方告警渠道配置
@@ -32,10 +33,10 @@ public class AlertChannel {
     private Boolean enabled = true; // 是否启用
     
     @Column(name = "created_time")
-    private Long createdTime; // 创建时间
+    private LocalDateTime createdTime; // 创建时间
     
     @Column(name = "updated_time")
-    private Long updatedTime; // 更新时间
+    private LocalDateTime updatedTime; // 更新时间
     
     @Column(name = "contact_info", length = 200)
     private String contactInfo; // 联系方式

@@ -6,6 +6,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Repository
@@ -18,13 +19,13 @@ public interface MetricRepository extends JpaRepository<Metric, Long> {
     Page<Metric> findByAgentIdOrderByTimestampDesc(String agentId, Pageable pageable);
     Page<Metric> findByAgentIdAndMetricTypeOrderByTimestampDesc(String agentId, String metricType, Pageable pageable);
     
-    // Add time range query support
-    List<Metric> findByAgentIdAndTimestampBetweenOrderByTimestampDesc(String agentId, Long startTime, Long endTime);
-    List<Metric> findByAgentIdAndMetricTypeAndTimestampBetweenOrderByTimestampDesc(String agentId, String metricType, Long startTime, Long endTime);
-    Page<Metric> findByAgentIdAndTimestampBetweenOrderByTimestampDesc(String agentId, Long startTime, Long endTime, Pageable pageable);
-    Page<Metric> findByAgentIdAndMetricTypeAndTimestampBetweenOrderByTimestampDesc(String agentId, String metricType, Long startTime, Long endTime, Pageable pageable);
+    // Add time range query support (LocalDateTime)
+    List<Metric> findByAgentIdAndTimestampBetweenOrderByTimestampDesc(String agentId, LocalDateTime startTime, LocalDateTime endTime);
+    List<Metric> findByAgentIdAndMetricTypeAndTimestampBetweenOrderByTimestampDesc(String agentId, String metricType, LocalDateTime startTime, LocalDateTime endTime);
+    Page<Metric> findByAgentIdAndTimestampBetweenOrderByTimestampDesc(String agentId, LocalDateTime startTime, LocalDateTime endTime, Pageable pageable);
+    Page<Metric> findByAgentIdAndMetricTypeAndTimestampBetweenOrderByTimestampDesc(String agentId, String metricType, LocalDateTime startTime, LocalDateTime endTime, Pageable pageable);
     
     // For alert checking
-    List<Metric> findByAgentIdAndMetricTypeAndTimestampBetween(String agentId, String metricType, Long startTime, Long endTime);
-    List<Metric> findByMetricTypeAndTimestampBetween(String metricType, Long startTime, Long endTime);
+    List<Metric> findByAgentIdAndMetricTypeAndTimestampBetween(String agentId, String metricType, LocalDateTime startTime, LocalDateTime endTime);
+    List<Metric> findByMetricTypeAndTimestampBetween(String metricType, LocalDateTime startTime, LocalDateTime endTime);
 }

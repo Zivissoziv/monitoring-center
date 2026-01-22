@@ -4,15 +4,15 @@
 
 -- Insert default metric definitions
 INSERT INTO metric_definitions (metric_name, display_name, description, metric_type, collection_command, collection_interval, processing_rule, unit, enabled, created_at, updated_at)
-SELECT 'CPU', 'CPU Usage', 'CPU usage percentage', 'NUMERIC', 'top -bn1 | awk ''/Cpu/{print 100-$8}''', 60, NULL, '%', TRUE, CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT), CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)
+SELECT 'CPU', 'CPU Usage', 'CPU usage percentage', 'NUMERIC', 'top -bn1 | awk ''/Cpu/{print 100-$8}''', 60, NULL, '%', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
 WHERE NOT EXISTS (SELECT 1 FROM metric_definitions WHERE metric_name = 'CPU');
 
 INSERT INTO metric_definitions (metric_name, display_name, description, metric_type, collection_command, collection_interval, processing_rule, unit, enabled, created_at, updated_at)
-SELECT 'MEMORY', 'Memory Usage', 'Memory usage percentage', 'NUMERIC', 'free | awk ''/Mem/{printf "%.2f", $3/$2*100}''', 60, NULL, '%', TRUE, CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT), CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)
+SELECT 'MEMORY', 'Memory Usage', 'Memory usage percentage', 'NUMERIC', 'free | awk ''/Mem/{printf "%.2f", $3/$2*100}''', 60, NULL, '%', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
 WHERE NOT EXISTS (SELECT 1 FROM metric_definitions WHERE metric_name = 'MEMORY');
 
 INSERT INTO metric_definitions (metric_name, display_name, description, metric_type, collection_command, collection_interval, processing_rule, unit, enabled, created_at, updated_at)
-SELECT 'PORT_8088', 'Port 8088 Status', 'Check if port 8088 is listening', 'BOOLEAN', 'netstat -tuln | grep :8088 > /dev/null && echo 1 || echo 0', 30, NULL, '', TRUE, CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT), CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)
+SELECT 'PORT_8088', 'Port 8088 Status', 'Check if port 8088 is listening', 'BOOLEAN', 'netstat -tuln | grep :8088 > /dev/null && echo 1 || echo 0', 30, NULL, '', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
 WHERE NOT EXISTS (SELECT 1 FROM metric_definitions WHERE metric_name = 'PORT_8088');
 
 -- Insert alert rule for port 8088 monitoring (boolean type)
@@ -25,8 +25,8 @@ INSERT INTO emergency_knowledge (title, description, created_at, updated_at)
 SELECT 
     'Port 8088 Quick Restart Solution', 
     'Immediate actions to restart the service on port 8088 and verify its status',
-    CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT),
-    CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)
+    CURRENT_TIMESTAMP,
+    CURRENT_TIMESTAMP
 WHERE NOT EXISTS (SELECT 1 FROM emergency_knowledge WHERE title = 'Port 8088 Quick Restart Solution');
 
 -- Insert emergency knowledge base 2: Diagnostic Investigation
@@ -34,8 +34,8 @@ INSERT INTO emergency_knowledge (title, description, created_at, updated_at)
 SELECT 
     'Port 8088 Diagnostic Investigation', 
     'Detailed diagnostic steps to investigate why port 8088 is not responding',
-    CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT),
-    CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)
+    CURRENT_TIMESTAMP,
+    CURRENT_TIMESTAMP
 WHERE NOT EXISTS (SELECT 1 FROM emergency_knowledge WHERE title = 'Port 8088 Diagnostic Investigation');
 
 -- Link both knowledge bases to the Port 8088 Down Alert rule
@@ -43,7 +43,7 @@ INSERT INTO alert_rule_emergency (alert_rule_id, emergency_knowledge_id, created
 SELECT 
     (SELECT id FROM alert_rules WHERE name = 'Port 8088 Down Alert' LIMIT 1),
     (SELECT id FROM emergency_knowledge WHERE title = 'Port 8088 Quick Restart Solution' LIMIT 1),
-    CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)
+    CURRENT_TIMESTAMP
 WHERE NOT EXISTS (
     SELECT 1 FROM alert_rule_emergency 
     WHERE alert_rule_id = (SELECT id FROM alert_rules WHERE name = 'Port 8088 Down Alert' LIMIT 1)
@@ -54,7 +54,7 @@ INSERT INTO alert_rule_emergency (alert_rule_id, emergency_knowledge_id, created
 SELECT 
     (SELECT id FROM alert_rules WHERE name = 'Port 8088 Down Alert' LIMIT 1),
     (SELECT id FROM emergency_knowledge WHERE title = 'Port 8088 Diagnostic Investigation' LIMIT 1),
-    CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)
+    CURRENT_TIMESTAMP
 WHERE NOT EXISTS (
     SELECT 1 FROM alert_rule_emergency 
     WHERE alert_rule_id = (SELECT id FROM alert_rules WHERE name = 'Port 8088 Down Alert' LIMIT 1)

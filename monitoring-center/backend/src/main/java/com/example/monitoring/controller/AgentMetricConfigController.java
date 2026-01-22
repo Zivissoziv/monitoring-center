@@ -2,45 +2,40 @@ package com.example.monitoring.controller;
 
 import com.example.monitoring.entity.AgentMetricConfig;
 import com.example.monitoring.service.AgentMetricConfigService;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.CrossOrigin;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
 @RestController
 @RequestMapping("/api/agent-metric-configs")
 @CrossOrigin(origins = "*")
+@RequiredArgsConstructor
 public class AgentMetricConfigController {
     
-    @Autowired
-    private AgentMetricConfigService configService;
+    private final AgentMetricConfigService configService;
     
     @GetMapping
-    public List<AgentMetricConfig> getAllConfigs() {
-        return configService.getAllConfigs();
+    public ResponseEntity<List<AgentMetricConfig>> getAllConfigs() {
+        return ResponseEntity.ok(configService.getAllConfigs());
     }
     
     @GetMapping("/agent/{agentId}")
-    public List<AgentMetricConfig> getConfigsByAgent(@PathVariable String agentId) {
-        return configService.getConfigsByAgent(agentId);
+    public ResponseEntity<List<AgentMetricConfig>> getConfigsByAgent(@PathVariable String agentId) {
+        return ResponseEntity.ok(configService.getConfigsByAgent(agentId));
     }
     
     @GetMapping("/agent/{agentId}/enabled")
-    public List<AgentMetricConfig> getEnabledConfigsByAgent(@PathVariable String agentId) {
-        return configService.getEnabledConfigsByAgent(agentId);
+    public ResponseEntity<List<AgentMetricConfig>> getEnabledConfigsByAgent(@PathVariable String agentId) {
+        return ResponseEntity.ok(configService.getEnabledConfigsByAgent(agentId));
     }
     
     @PostMapping
-    public AgentMetricConfig createOrUpdateConfig(@RequestBody AgentMetricConfig config) {
-        return configService.createOrUpdateConfig(config);
+    public ResponseEntity<AgentMetricConfig> createOrUpdateConfig(@RequestBody AgentMetricConfig config) {
+        AgentMetricConfig saved = configService.createOrUpdateConfig(config);
+        return ResponseEntity.status(config.getId() == null ? HttpStatus.CREATED : HttpStatus.OK).body(saved);
     }
     
     @PostMapping("/agent/{agentId}/initialize")

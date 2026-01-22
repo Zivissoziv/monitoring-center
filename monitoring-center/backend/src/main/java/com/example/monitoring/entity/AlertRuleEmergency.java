@@ -9,6 +9,7 @@ import javax.persistence.GeneratedValue;
 import javax.persistence.GenerationType;
 import javax.persistence.Id;
 import javax.persistence.Table;
+import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "alert_rule_emergency")
@@ -26,11 +27,11 @@ public class AlertRuleEmergency {
     private Long emergencyKnowledgeId;
     
     @Column(name = "created_at")
-    private long createdAt;
+    private LocalDateTime createdAt;
     
     public AlertRuleEmergency(Long alertRuleId, Long emergencyKnowledgeId) {
         this.alertRuleId = alertRuleId;
         this.emergencyKnowledgeId = emergencyKnowledgeId;
-        this.createdAt = System.currentTimeMillis();
+        this.createdAt = LocalDateTime.now();
     }
 }

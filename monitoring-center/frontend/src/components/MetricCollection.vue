@@ -315,16 +315,20 @@ export default {
           if (this.searchForm.metricType) {
             // Agent + MetricType + optional TimeRange
             if (hasTimeRange) {
-              url = `/api/metrics/agent/${this.searchForm.agentId}/type/${this.searchForm.metricType}/timerange/paginated?startTime=${this.searchForm.timeRange[0]}&endTime=${this.searchForm.timeRange[1]}&page=${page}&size=${size}`
+              const startTime = this.formatTimeForBackend(this.searchForm.timeRange[0])
+              const endTime = this.formatTimeForBackend(this.searchForm.timeRange[1])
+              url = `/api/metrics/agent/${this.searchForm.agentId}/type/${this.searchForm.metricType}/timerange?startTime=${encodeURIComponent(startTime)}&endTime=${encodeURIComponent(endTime)}&page=${page}&size=${size}`
             } else {
-              url = `/api/metrics/agent/${this.searchForm.agentId}/type/${this.searchForm.metricType}/paginated?page=${page}&size=${size}`
+              url = `/api/metrics/agent/${this.searchForm.agentId}/type/${this.searchForm.metricType}?page=${page}&size=${size}`
             }
           } else {
             // Agent only + optional TimeRange
             if (hasTimeRange) {
-              url = `/api/metrics/agent/${this.searchForm.agentId}/timerange/paginated?startTime=${this.searchForm.timeRange[0]}&endTime=${this.searchForm.timeRange[1]}&page=${page}&size=${size}`
+              const startTime = this.formatTimeForBackend(this.searchForm.timeRange[0])
+              const endTime = this.formatTimeForBackend(this.searchForm.timeRange[1])
+              url = `/api/metrics/agent/${this.searchForm.agentId}/timerange?startTime=${encodeURIComponent(startTime)}&endTime=${encodeURIComponent(endTime)}&page=${page}&size=${size}`
             } else {
-              url = `/api/metrics/agent/${this.searchForm.agentId}/paginated?page=${page}&size=${size}`
+              url = `/api/metrics/agent/${this.searchForm.agentId}?page=${page}&size=${size}`
             }
           }
         } else {
@@ -337,10 +341,12 @@ export default {
             
             // Apply time range filter if set
             if (hasTimeRange) {
-              filtered = filtered.filter(m => 
-                m.timestamp >= parseInt(this.searchForm.timeRange[0]) && 
-                m.timestamp <= parseInt(this.searchForm.timeRange[1])
-              )
+              const startMs = parseInt(this.searchForm.timeRange[0])
+              const endMs = parseInt(this.searchForm.timeRange[1])
+              filtered = filtered.filter(m => {
+                const ts = this.parseTimestamp(m.timestamp)
+                return ts >= startMs && ts <= endMs
+              })
             }
             
             this.metrics = filtered
@@ -350,12 +356,12 @@ export default {
             const startIndex = page * size
             const endIndex = startIndex + size
             this.filteredMetrics = filtered.slice(startIndex, endIndex)
-            this.filteredMetrics.sort((a, b) => b.timestamp - a.timestamp)
+            this.filteredMetrics.sort((a, b) => this.parseTimestamp(b.timestamp) - this.parseTimestamp(a.timestamp))
             return
           } else {
             // All metrics - time range not supported for global query without agent
             // Just use pagination
-            url = `/api/metrics/paginated?page=${page}&size=${size}`
+            url = `/api/metrics?page=${page}&size=${size}`
           }
         }
         
@@ -373,7 +379,7 @@ export default {
         }
         
         // Sort by timestamp descending (newest first)
-        this.filteredMetrics.sort((a, b) => b.timestamp - a.timestamp)
+        this.filteredMetrics.sort((a, b) => this.parseTimestamp(b.timestamp) - this.parseTimestamp(a.timestamp))
       } catch (error) {
         console.error('Error loading paginated data:', error)
         ElMessage.error('加载数据失败')
@@ -652,12 +658,26 @@ export default {
       return value.toFixed(2) + (unit ? ' ' + unit : '')
     },
     
+    // Parse timestamp - handles both ISO string and milliseconds
+    parseTimestamp(timestamp) {
+      if (typeof timestamp === 'string') {
+        return new Date(timestamp).getTime()
+      }
+      return timestamp
+    },
+    
+    // Format milliseconds to ISO string for backend API
+    formatTimeForBackend(ms) {
+      return new Date(ms).toISOString().slice(0, 19)
+    },
+    
     formatTime(timestamp) {
-      return new Date(timestamp).toLocaleString('zh-CN')
+      const date = typeof timestamp === 'string' ? new Date(timestamp) : new Date(timestamp)
+      return date.toLocaleString('zh-CN')
     },
     
     formatTimeShort(timestamp) {
-      const date = new Date(timestamp)
+      const date = typeof timestamp === 'string' ? new Date(timestamp) : new Date(timestamp)
       return date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
     },
     

@@ -462,7 +462,7 @@ export default {
         this.knowledgeList = await knowledgeResponse.json()
         
         // Load alert rules
-        const rulesResponse = await fetch('/api/alerts/rules')
+        const rulesResponse = await fetch('/api/alert-rules')
         this.alertRules = await rulesResponse.json()
         
         // Load agents
@@ -510,7 +510,9 @@ export default {
     
     formatTime(timestamp) {
       if (!timestamp) return '-'
-      return new Date(timestamp).toLocaleString('zh-CN')
+      // Handle both ISO string and milliseconds
+      const date = typeof timestamp === 'string' ? new Date(timestamp) : new Date(timestamp)
+      return date.toLocaleString('zh-CN')
     },
     
     openCreateDialog() {

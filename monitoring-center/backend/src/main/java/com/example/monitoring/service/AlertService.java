@@ -4,33 +4,34 @@ import com.example.monitoring.entity.Alert;
 import com.example.monitoring.entity.AlertRule;
 import com.example.monitoring.entity.Metric;
 import com.example.monitoring.entity.MetricDefinition;
+import com.example.monitoring.enums.AlertCondition;
+import com.example.monitoring.enums.AlertStatus;
+import com.example.monitoring.enums.MetricValueType;
 import com.example.monitoring.repository.AlertRepository;
 import com.example.monitoring.repository.AlertRuleRepository;
 import com.example.monitoring.repository.MetricDefinitionRepository;
 import com.example.monitoring.repository.MetricRepository;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class AlertService {
 
-    @Autowired
-    private AlertRuleRepository alertRuleRepository;
+    private final AlertRuleRepository alertRuleRepository;
+    private final AlertRepository alertRepository;
+    private final MetricRepository metricRepository;
+    private final MetricDefinitionRepository metricDefinitionRepository;
 
-    @Autowired
-    private AlertRepository alertRepository;
-
-    @Autowired
-    private MetricRepository metricRepository;
+    // ==================== AlertRule CRUD ====================
     
-    @Autowired
-    private MetricDefinitionRepository metricDefinitionRepository;
-
     public List<AlertRule> getAllAlertRules() {
         return alertRuleRepository.findAll();
     }
@@ -68,16 +69,18 @@ public class AlertService {
         alertRuleRepository.delete(alertRule);
     }
 
+    // ==================== Alert Check Logic ====================
+    
     /**
      * Check alert for a specific metric and rule (called by event listener)
      */
     public boolean checkAlert(Metric metric, AlertRule rule) {
         // Get metric definition to determine metric type
         Optional<MetricDefinition> metricDefOpt = metricDefinitionRepository.findByMetricName(metric.getMetricType());
-        String metricType = metricDefOpt.map(MetricDefinition::getMetricType).orElse("NUMERIC");
+        MetricValueType metricType = metricDefOpt.map(MetricDefinition::getMetricType).orElse(MetricValueType.NUMERIC);
         
         // Record or update alert
-        recordAlert(rule, metric);
+        recordAlert(rule, metric, metricType);
         
         return true;
     }
@@ -88,7 +91,7 @@ public class AlertService {
     public boolean checkAlert(Metric metric) {
         // Get metric definition to determine metric type
         Optional<MetricDefinition> metricDefOpt = metricDefinitionRepository.findByMetricName(metric.getMetricType());
-        String metricType = metricDefOpt.map(MetricDefinition::getMetricType).orElse("NUMERIC");
+        MetricValueType metricType = metricDefOpt.map(MetricDefinition::getMetricType).orElse(MetricValueType.NUMERIC);
         
         // Get all enabled alert rules for this metric type
         List<AlertRule> alertRules = alertRuleRepository.findByMetricTypeAndEnabledTrue(metric.getMetricType());
@@ -103,7 +106,7 @@ public class AlertService {
 
                 if (alertTriggered) {
                     // Record or update alert (merge if exists)
-                    recordAlert(rule, metric);
+                    recordAlert(rule, metric, metricType);
                     anyAlertTriggered = true;
                 }
             }
@@ -115,13 +118,13 @@ public class AlertService {
     /**
      * Evaluate alert condition based on metric type
      */
-    private boolean evaluateAlertCondition(Metric metric, AlertRule rule, String metricType) {
+    private boolean evaluateAlertCondition(Metric metric, AlertRule rule, MetricValueType metricType) {
         switch (metricType) {
-            case "NUMERIC":
+            case NUMERIC:
                 return evaluateNumericCondition(metric.getValue(), rule);
-            case "BOOLEAN":
+            case BOOLEAN:
                 return evaluateBooleanCondition(metric.getValue(), rule);
-            case "STRING":
+            case STRING:
                 return evaluateStringCondition(metric.getTextValue(), rule);
             default:
                 log.warn("Unknown metric type: {}, defaulting to NUMERIC", metricType);
@@ -139,28 +142,29 @@ public class AlertService {
         }
         
         double threshold = rule.getThreshold();
-        switch (rule.getCondition()) {
-            case "GT":
-            case ">":
+        AlertCondition condition = rule.getCondition();
+        
+        if (condition == null) {
+            log.warn("Rule {} has no condition", rule.getId());
+            return false;
+        }
+        
+        switch (condition) {
+            case GT:
                 return value > threshold;
-            case "LT":
-            case "<":
+            case LT:
                 return value < threshold;
-            case "GTE":
-            case ">=":
+            case GTE:
                 return value >= threshold;
-            case "LTE":
-            case "<=":
+            case LTE:
                 return value <= threshold;
-            case "EQ":
-            case "=":
-            case "EQUALS":
+            case EQ:
+            case EQUALS:
                 return Math.abs(value - threshold) < 0.001;
-            case "NOT_EQUALS":
-            case "!=":
+            case NOT_EQUALS:
                 return Math.abs(value - threshold) >= 0.001;
             default:
-                log.warn("Unknown numeric condition: {}", rule.getCondition());
+                log.warn("Unknown numeric condition: {}", condition);
                 return false;
         }
     }
@@ -177,16 +181,19 @@ public class AlertService {
         boolean metricBool = value > 0.5; // 0 = false, 1 = true
         boolean expectedBool = "true".equalsIgnoreCase(rule.getThresholdText()) || "1".equals(rule.getThresholdText());
         
-        switch (rule.getCondition()) {
-            case "EQUALS":
-            case "=":
-            case "EQ":
+        AlertCondition condition = rule.getCondition();
+        if (condition == null) {
+            return false;
+        }
+        
+        switch (condition) {
+            case EQUALS:
+            case EQ:
                 return metricBool == expectedBool;
-            case "NOT_EQUALS":
-            case "!=":
+            case NOT_EQUALS:
                 return metricBool != expectedBool;
             default:
-                log.warn("Unknown boolean condition: {}", rule.getCondition());
+                log.warn("Unknown boolean condition: {}", condition);
                 return false;
         }
     }
@@ -205,21 +212,22 @@ public class AlertService {
         }
         
         String expected = rule.getThresholdText();
+        AlertCondition condition = rule.getCondition();
         
-        switch (rule.getCondition()) {
-            case "EQUALS":
-            case "=":
-            case "EQ":
+        if (condition == null) {
+            return false;
+        }
+        
+        switch (condition) {
+            case EQUALS:
+            case EQ:
                 return value.equals(expected);
-            case "NOT_EQUALS":
-            case "!=":
+            case NOT_EQUALS:
                 return !value.equals(expected);
-            case "CONTAINS":
+            case CONTAINS:
                 return value.contains(expected);
-            case "NOT_CONTAINS":
-                return !value.contains(expected);
             default:
-                log.warn("Unknown string condition: {}", rule.getCondition());
+                log.warn("Unknown string condition: {}", condition);
                 return false;
         }
     }
@@ -228,36 +236,29 @@ public class AlertService {
      * Record alert or update existing one (merge alerts for same rule and agent)
      * Note: If existing alert is RESOLVED, create a new alert instead of reactivating
      */
-    private void recordAlert(AlertRule rule, Metric metric) {
-        // Get metric definition to determine type
-        Optional<MetricDefinition> metricDefOpt = metricDefinitionRepository.findByMetricName(metric.getMetricType());
-        String metricType = metricDefOpt.map(MetricDefinition::getMetricType).orElse("NUMERIC");
-        
+    private void recordAlert(AlertRule rule, Metric metric, MetricValueType metricType) {
         // Only look for ACTIVE or ACKNOWLEDGED alerts (not RESOLVED)
         Optional<Alert> existingAlert = alertRepository.findByAlertRuleIdAndAgentIdAndStatusIn(
                 rule.getId(), 
                 metric.getAgentId(),
-                java.util.Arrays.asList("ACTIVE", "ACKNOWLEDGED"));
+                Arrays.asList(AlertStatus.ACTIVE, AlertStatus.ACKNOWLEDGED));
 
         if (existingAlert.isPresent()) {
             Alert alert = existingAlert.get();
             
             // Update existing active/acknowledged alert based on metric type
-            if ("NUMERIC".equals(metricType)) {
+            if (metricType == MetricValueType.NUMERIC || metricType == MetricValueType.BOOLEAN) {
                 alert.setTriggerValue(metric.getValue());
-            } else if ("STRING".equals(metricType)) {
+            } else if (metricType == MetricValueType.STRING) {
                 alert.setTriggerValueText(metric.getTextValue());
-            } else if ("BOOLEAN".equals(metricType)) {
-                alert.setTriggerValue(metric.getValue());
             }
-            alert.setLastTriggeredAt(System.currentTimeMillis());
+            alert.setLastTriggeredAt(LocalDateTime.now());
             alert.setTriggerCount(alert.getTriggerCount() + 1);
             alertRepository.save(alert);
         } else {
             // No active/acknowledged alert exists, create a new one
-            // This includes the case where a previous alert was RESOLVED
             Alert alert;
-            if ("NUMERIC".equals(metricType)) {
+            if (metricType == MetricValueType.NUMERIC) {
                 alert = new Alert(
                         rule.getId(),
                         metric.getAgentId(),
@@ -270,7 +271,7 @@ public class AlertService {
                 alert.setAlertMessage(rule.getAlertMessage());
             } else {
                 // Boolean or String type
-                String triggerText = "STRING".equals(metricType) ? 
+                String triggerText = metricType == MetricValueType.STRING ? 
                         metric.getTextValue() : 
                         (metric.getValue() > 0.5 ? "true" : "false");
                 alert = new Alert(
@@ -288,17 +289,17 @@ public class AlertService {
         }
     }
 
-    // Alert management methods
+    // ==================== Alert CRUD ====================
 
     public List<Alert> getAllAlerts() {
         return alertRepository.findAll();
     }
 
     public List<Alert> getActiveAlerts() {
-        return alertRepository.findByStatusOrderByLastTriggeredAtDesc("ACTIVE");
+        return alertRepository.findByStatusOrderByLastTriggeredAtDesc(AlertStatus.ACTIVE);
     }
 
-    public List<Alert> getAlertsByStatus(String status) {
+    public List<Alert> getAlertsByStatus(AlertStatus status) {
         return alertRepository.findByStatusOrderByLastTriggeredAtDesc(status);
     }
 
@@ -306,9 +307,9 @@ public class AlertService {
         Alert alert = alertRepository.findById(alertId)
                 .orElseThrow(() -> new RuntimeException("Alert not found with id: " + alertId));
 
-        alert.setStatus("ACKNOWLEDGED");
+        alert.setStatus(AlertStatus.ACKNOWLEDGED);
         alert.setAcknowledgedBy(acknowledgedBy);
-        alert.setAcknowledgedAt(System.currentTimeMillis());
+        alert.setAcknowledgedAt(LocalDateTime.now());
 
         return alertRepository.save(alert);
     }
@@ -317,9 +318,9 @@ public class AlertService {
         Alert alert = alertRepository.findById(alertId)
                 .orElseThrow(() -> new RuntimeException("Alert not found with id: " + alertId));
 
-        alert.setStatus("RESOLVED");
+        alert.setStatus(AlertStatus.RESOLVED);
         alert.setResolveNote(resolveNote);
-        alert.setResolvedAt(System.currentTimeMillis());
+        alert.setResolvedAt(LocalDateTime.now());
 
         return alertRepository.save(alert);
     }

@@ -2,36 +2,32 @@ package com.example.monitoring.controller;
 
 import com.example.monitoring.entity.AlertRule;
 import com.example.monitoring.service.AlertService;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.CrossOrigin;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+/**
+ * 告警规则管理接口 (独立资源)
+ */
 @Slf4j
 @RestController
-@RequestMapping("/api/alerts")
+@RequestMapping("/api/alert-rules")
 @CrossOrigin(origins = "*")
-public class AlertController {
+@RequiredArgsConstructor
+public class AlertRuleController {
     
-    @Autowired
-private AlertService alertService;
+    private final AlertService alertService;
     
-    @GetMapping("/rules")
-    public List<AlertRule> getAllAlertRules() {
-        return alertService.getAllAlertRules();
+    @GetMapping
+    public ResponseEntity<List<AlertRule>> getAllAlertRules() {
+        return ResponseEntity.ok(alertService.getAllAlertRules());
     }
     
-    @GetMapping("/rules/{id}")
+    @GetMapping("/{id}")
     public ResponseEntity<AlertRule> getAlertRuleById(@PathVariable Long id) {
         try {
             AlertRule alertRule = alertService.getAlertRuleById(id);
@@ -42,15 +38,15 @@ private AlertService alertService;
         }
     }
     
-    @PostMapping("/rules")
-    public AlertRule createAlertRule(@RequestBody AlertRule alertRule) {
-        log.info("POST /api/alerts/rules - Creating alert rule: {}", alertRule.getName());
+    @PostMapping
+    public ResponseEntity<AlertRule> createAlertRule(@RequestBody AlertRule alertRule) {
+        log.info("POST /api/alert-rules - Creating alert rule: {}", alertRule.getName());
         AlertRule result = alertService.createAlertRule(alertRule);
-        log.info("POST /api/alerts/rules - Success");
-        return result;
+        log.info("POST /api/alert-rules - Success, id: {}", result.getId());
+        return ResponseEntity.status(HttpStatus.CREATED).body(result);
     }
     
-    @PutMapping("/rules/{id}")
+    @PutMapping("/{id}")
     public ResponseEntity<AlertRule> updateAlertRule(@PathVariable Long id, @RequestBody AlertRule alertRuleDetails) {
         try {
             AlertRule updatedAlertRule = alertService.updateAlertRule(id, alertRuleDetails);
@@ -61,7 +57,7 @@ private AlertService alertService;
         }
     }
     
-    @DeleteMapping("/rules/{id}")
+    @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteAlertRule(@PathVariable Long id) {
         try {
             alertService.deleteAlertRule(id);

@@ -1,44 +1,47 @@
 package com.example.monitoring.controller;
 
 import com.example.monitoring.entity.Alert;
+import com.example.monitoring.enums.AlertStatus;
 import com.example.monitoring.service.AlertService;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.CrossOrigin;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
 
+/**
+ * 告警监控接口
+ */
 @Slf4j
 @RestController
 @RequestMapping("/api/alerts")
 @CrossOrigin(origins = "*")
+@RequiredArgsConstructor
 public class AlertMonitorController {
     
-    @Autowired
-    private AlertService alertService;
+    private final AlertService alertService;
     
     @GetMapping
-    public List<Alert> getAllAlerts() {
-        return alertService.getAllAlerts();
+    public ResponseEntity<List<Alert>> getAllAlerts() {
+        return ResponseEntity.ok(alertService.getAllAlerts());
     }
     
     @GetMapping("/active")
-    public List<Alert> getActiveAlerts() {
-        return alertService.getActiveAlerts();
+    public ResponseEntity<List<Alert>> getActiveAlerts() {
+        return ResponseEntity.ok(alertService.getActiveAlerts());
     }
     
     @GetMapping("/status/{status}")
-    public List<Alert> getAlertsByStatus(@PathVariable String status) {
-        return alertService.getAlertsByStatus(status);
+    public ResponseEntity<List<Alert>> getAlertsByStatus(@PathVariable String status) {
+        try {
+            AlertStatus alertStatus = AlertStatus.valueOf(status.toUpperCase());
+            return ResponseEntity.ok(alertService.getAlertsByStatus(alertStatus));
+        } catch (IllegalArgumentException e) {
+            log.warn("Invalid alert status: {}", status);
+            return ResponseEntity.badRequest().build();
+        }
     }
     
     @PostMapping("/{id}/acknowledge")

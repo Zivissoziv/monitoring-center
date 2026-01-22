@@ -1,6 +1,7 @@
 package com.example.monitoring.job;
 
 import com.example.monitoring.entity.Alert;
+import com.example.monitoring.enums.AlertStatus;
 import com.example.monitoring.repository.AlertRepository;
 import com.example.monitoring.entity.AlertRule;
 import com.example.monitoring.repository.AlertRuleRepository;
@@ -15,6 +16,9 @@ import org.quartz.JobExecutionException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 
@@ -51,9 +55,15 @@ public class AlertCheckJob implements Job {
             long now = System.currentTimeMillis();
             long checkWindow = 60000; // Check metrics from last 60 seconds
             
+            // Convert to LocalDateTime for repository queries
+            LocalDateTime startTime = LocalDateTime.ofInstant(
+                    Instant.ofEpochMilli(now - checkWindow), ZoneId.systemDefault());
+            LocalDateTime endTime = LocalDateTime.ofInstant(
+                    Instant.ofEpochMilli(now), ZoneId.systemDefault());
+            
             for (AlertRule rule : rules) {
                 try {
-                    checkAlertRule(rule, now - checkWindow, now);
+                    checkAlertRule(rule, startTime, endTime);
                 } catch (Exception e) {
                     log.error("Error checking alert rule {}: {}", rule.getId(), e.getMessage());
                 }
@@ -66,10 +76,10 @@ public class AlertCheckJob implements Job {
         }
     }
     
-    private void checkAlertRule(AlertRule rule, long startTime, long endTime) {
+    private void checkAlertRule(AlertRule rule, LocalDateTime startTime, LocalDateTime endTime) {
         // Get metric definition to determine metric type
         Optional<MetricDefinition> metricDefOpt = metricDefinitionRepository.findByMetricName(rule.getMetricType());
-        String metricType = metricDefOpt.map(MetricDefinition::getMetricType).orElse("NUMERIC");
+        String metricType = metricDefOpt.map(def -> def.getMetricType().name()).orElse("NUMERIC");
         
         // Get recent metrics for this rule
         List<Metric> metrics;
@@ -129,24 +139,18 @@ public class AlertCheckJob implements Job {
         
         double threshold = rule.getThreshold();
         switch (rule.getCondition()) {
-            case "GT":
-            case ">":
+            case GT:
                 return value > threshold;
-            case "LT":
-            case "<":
+            case LT:
                 return value < threshold;
-            case "GTE":
-            case ">=":
+            case GTE:
                 return value >= threshold;
-            case "LTE":
-            case "<=":
+            case LTE:
                 return value <= threshold;
-            case "EQ":
-            case "=":
-            case "EQUALS":
+            case EQ:
+            case EQUALS:
                 return Math.abs(value - threshold) < 0.001;
-            case "NOT_EQUALS":
-            case "!=":
+            case NOT_EQUALS:
                 return Math.abs(value - threshold) >= 0.001;
             default:
                 log.warn("Unknown numeric condition: {}", rule.getCondition());
@@ -167,12 +171,10 @@ public class AlertCheckJob implements Job {
         boolean expectedBool = "true".equalsIgnoreCase(rule.getThresholdText()) || "1".equals(rule.getThresholdText());
         
         switch (rule.getCondition()) {
-            case "EQUALS":
-            case "=":
-            case "EQ":
+            case EQUALS:
+            case EQ:
                 return metricBool == expectedBool;
-            case "NOT_EQUALS":
-            case "!=":
+            case NOT_EQUALS:
                 return metricBool != expectedBool;
             default:
                 log.warn("Unknown boolean condition: {}", rule.getCondition());
@@ -196,17 +198,13 @@ public class AlertCheckJob implements Job {
         String expected = rule.getThresholdText();
         
         switch (rule.getCondition()) {
-            case "EQUALS":
-            case "=":
-            case "EQ":
+            case EQUALS:
+            case EQ:
                 return value.equals(expected);
-            case "NOT_EQUALS":
-            case "!=":
+            case NOT_EQUALS:
                 return !value.equals(expected);
-            case "CONTAINS":
+            case CONTAINS:
                 return value.contains(expected);
-            case "NOT_CONTAINS":
-                return !value.contains(expected);
             default:
                 log.warn("Unknown string condition: {}", rule.getCondition());
                 return false;
@@ -216,13 +214,13 @@ public class AlertCheckJob implements Job {
     private void handleTriggeredAlert(AlertRule rule, Metric metric) {
         // Get metric definition to determine type
         Optional<MetricDefinition> metricDefOpt = metricDefinitionRepository.findByMetricName(metric.getMetricType());
-        String metricType = metricDefOpt.map(MetricDefinition::getMetricType).orElse("NUMERIC");
+        String metricType = metricDefOpt.map(def -> def.getMetricType().name()).orElse("NUMERIC");
         
         // Only look for ACTIVE or ACKNOWLEDGED alerts (not RESOLVED)
         Alert existingAlert = alertRepository.findByAlertRuleIdAndAgentIdAndStatusIn(
                 rule.getId(), 
                 metric.getAgentId(), 
-                java.util.Arrays.asList("ACTIVE", "ACKNOWLEDGED")
+                java.util.Arrays.asList(AlertStatus.ACTIVE, AlertStatus.ACKNOWLEDGED)
         ).orElse(null);
         
         if (existingAlert != null) {
@@ -234,7 +232,7 @@ public class AlertCheckJob implements Job {
             } else if ("BOOLEAN".equals(metricType)) {
                 existingAlert.setTriggerValue(metric.getValue());
             }
-            existingAlert.setLastTriggeredAt(System.currentTimeMillis());
+            existingAlert.setLastTriggeredAt(LocalDateTime.now());
             existingAlert.setTriggerCount(existingAlert.getTriggerCount() + 1);
             alertRepository.save(existingAlert);
             
@@ -283,7 +281,7 @@ public class AlertCheckJob implements Job {
     private void autoResolveAlertsForRule(AlertRule rule, java.util.Set<String> triggeredAgents, List<Metric> recentMetrics) {
         // Find all active/acknowledged alerts for this rule
         List<Alert> alertsForRule = alertRepository.findByStatusIn(
-                java.util.Arrays.asList("ACTIVE", "ACKNOWLEDGED"));
+                java.util.Arrays.asList(AlertStatus.ACTIVE, AlertStatus.ACKNOWLEDGED));
         
         for (Alert alert : alertsForRule) {
             // Only process alerts for this specific rule
@@ -304,18 +302,18 @@ public class AlertCheckJob implements Job {
             
             if (hasRecentMetrics) {
                 // Has recent metrics but they don't violate the condition - auto-resolve
-                alert.setStatus("RESOLVED");
+                alert.setStatus(AlertStatus.RESOLVED);
                 alert.setResolveNote("Auto-resolved: condition no longer met");
-                alert.setResolvedAt(System.currentTimeMillis());
+                alert.setResolvedAt(LocalDateTime.now());
                 alertRepository.save(alert);
                 
                 log.info("Auto-resolved alert {} for agent {} - recent metrics no longer violate condition (rule: {})",
                         alert.getId(), alert.getAgentId(), rule.getName());
             } else {
                 // No recent metrics for this agent - auto-resolve
-                alert.setStatus("RESOLVED");
+                alert.setStatus(AlertStatus.RESOLVED);
                 alert.setResolveNote("Auto-resolved: no recent metrics");
-                alert.setResolvedAt(System.currentTimeMillis());
+                alert.setResolvedAt(LocalDateTime.now());
                 alertRepository.save(alert);
                 
                 log.info("Auto-resolved alert {} for agent {} - no recent metrics (rule: {})",

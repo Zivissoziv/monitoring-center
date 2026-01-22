@@ -1,6 +1,7 @@
 package com.example.monitoring.event;
 
 import com.example.monitoring.entity.Alert;
+import com.example.monitoring.enums.AlertStatus;
 import com.example.monitoring.repository.AlertRepository;
 import com.example.monitoring.entity.AlertRule;
 import com.example.monitoring.repository.AlertRuleRepository;
@@ -14,6 +15,7 @@ import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -96,14 +98,14 @@ public class AlertEventListener {
             Optional<Alert> existingAlertOpt = alertRepository.findByAlertRuleIdAndAgentIdAndStatusIn(
                     rule.getId(),
                     agentId,
-                    java.util.Arrays.asList("ACTIVE", "ACKNOWLEDGED")
+                    java.util.Arrays.asList(AlertStatus.ACTIVE, AlertStatus.ACKNOWLEDGED)
             );
             
             if (existingAlertOpt.isPresent()) {
                 Alert alert = existingAlertOpt.get();
-                alert.setStatus("RESOLVED");
+                alert.setStatus(AlertStatus.RESOLVED);
                 alert.setResolveNote("Auto-resolved: condition no longer met");
-                alert.setResolvedAt(System.currentTimeMillis());
+                alert.setResolvedAt(LocalDateTime.now());
                 alertRepository.save(alert);
                 
                 log.info("Auto-resolved alert {} for agent {} - condition no longer met (rule: {})",
@@ -121,7 +123,7 @@ public class AlertEventListener {
     private boolean evaluateRule(Metric metric, AlertRule rule) {
         // Get metric definition to determine type
         Optional<MetricDefinition> metricDefOpt = metricDefinitionRepository.findByMetricName(metric.getMetricType());
-        String metricType = metricDefOpt.map(MetricDefinition::getMetricType).orElse("NUMERIC");
+        String metricType = metricDefOpt.map(def -> def.getMetricType().name()).orElse("NUMERIC");
         
         switch (metricType) {
             case "NUMERIC":
@@ -143,24 +145,18 @@ public class AlertEventListener {
         
         double threshold = rule.getThreshold();
         switch (rule.getCondition()) {
-            case "GT":
-            case ">":
+            case GT:
                 return value > threshold;
-            case "LT":
-            case "<":
+            case LT:
                 return value < threshold;
-            case "GTE":
-            case ">=":
+            case GTE:
                 return value >= threshold;
-            case "LTE":
-            case "<=":
+            case LTE:
                 return value <= threshold;
-            case "EQ":
-            case "=":
-            case "EQUALS":
+            case EQ:
+            case EQUALS:
                 return Math.abs(value - threshold) < 0.001;
-            case "NOT_EQUALS":
-            case "!=":
+            case NOT_EQUALS:
                 return Math.abs(value - threshold) >= 0.001;
             default:
                 return false;
@@ -177,12 +173,10 @@ public class AlertEventListener {
                                "1".equals(rule.getThresholdText());
         
         switch (rule.getCondition()) {
-            case "EQUALS":
-            case "=":
-            case "EQ":
+            case EQUALS:
+            case EQ:
                 return metricBool == expectedBool;
-            case "NOT_EQUALS":
-            case "!=":
+            case NOT_EQUALS:
                 return metricBool != expectedBool;
             default:
                 return false;
@@ -201,17 +195,13 @@ public class AlertEventListener {
         String expected = rule.getThresholdText();
         
         switch (rule.getCondition()) {
-            case "EQUALS":
-            case "=":
-            case "EQ":
+            case EQUALS:
+            case EQ:
                 return value.equals(expected);
-            case "NOT_EQUALS":
-            case "!=":
+            case NOT_EQUALS:
                 return !value.equals(expected);
-            case "CONTAINS":
+            case CONTAINS:
                 return value.contains(expected);
-            case "NOT_CONTAINS":
-                return !value.contains(expected);
             default:
                 return false;
         }

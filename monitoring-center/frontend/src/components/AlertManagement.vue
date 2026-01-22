@@ -383,7 +383,7 @@ export default {
     async loadAlertRules() {
       this.loading = true
       try {
-        const response = await fetch('/api/alerts/rules')
+        const response = await fetch('/api/alert-rules')
         this.alertRules = await response.json()
       } catch (error) {
         console.error('Error loading alert rules:', error)
@@ -528,7 +528,7 @@ export default {
       }
       
       try {
-        const response = await fetch('/api/alerts/rules', {
+        const response = await fetch('/api/alert-rules', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
@@ -571,7 +571,7 @@ export default {
       }
       
       try {
-        const response = await fetch(`/api/alerts/rules/${this.editingRuleId}`, {
+        const response = await fetch(`/api/alert-rules/${this.editingRuleId}`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json'
@@ -594,7 +594,7 @@ export default {
     
     async deleteAlertRule(id) {
       try {
-        const response = await fetch(`/api/alerts/rules/${id}`, {
+        const response = await fetch(`/api/alert-rules/${id}`, {
           method: 'DELETE'
         })
         

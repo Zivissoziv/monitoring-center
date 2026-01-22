@@ -5,38 +5,39 @@ import com.example.monitoring.dto.ThirdPartyAlertRequest;
 import com.example.monitoring.entity.Alert;
 import com.example.monitoring.entity.AlertChannel;
 import com.example.monitoring.entity.ThirdPartyAlert;
+import com.example.monitoring.enums.AlertStatus;
+import com.example.monitoring.enums.PushStatus;
+import com.example.monitoring.enums.Severity;
+import com.example.monitoring.enums.ThirdPartyAlertStatus;
 import com.example.monitoring.repository.AlertChannelRepository;
 import com.example.monitoring.repository.AlertRepository;
 import com.example.monitoring.repository.ThirdPartyAlertRepository;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import javax.servlet.http.HttpServletRequest;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class ThirdPartyAlertService {
     
-    @Autowired
-    private AlertChannelRepository channelRepository;
-    
-    @Autowired
-    private ThirdPartyAlertRepository alertRepository;
-    
-    @Autowired
-    private AlertRepository systemAlertRepository;
+    private final AlertChannelRepository channelRepository;
+    private final ThirdPartyAlertRepository alertRepository;
+    private final AlertRepository systemAlertRepository;
     
     /**
      * 接收第三方告警推送
      */
     @Transactional
     public ThirdPartyAlert receiveAlert(ThirdPartyAlertRequest request, HttpServletRequest httpRequest) {
-        long startTime = System.currentTimeMillis();
+        LocalDateTime startTime = LocalDateTime.now();
         String sourceIp = getClientIp(httpRequest);
         
         log.info("Received third-party alert from channel: {}, IP: {}", request.getChannelCode(), sourceIp);
@@ -45,8 +46,8 @@ public class ThirdPartyAlertService {
         alert.setChannelCode(request.getChannelCode());
         alert.setExternalAlertId(request.getExternalAlertId());
         alert.setAlertContent(request.getAlertContent());
-        alert.setAlertStatus(request.getAlertStatus());
-        alert.setSeverity(request.getSeverity() != null ? request.getSeverity() : "提醒");
+        alert.setAlertStatus(parseThirdPartyAlertStatus(request.getAlertStatus()));
+        alert.setSeverity(parseSeverity(request.getSeverity()));
         alert.setReceivedTime(startTime);
         alert.setSourceIp(sourceIp);
         
@@ -60,23 +61,12 @@ public class ThirdPartyAlertService {
             }
             
             // 验证告警状态
-            if (!request.getAlertStatus().equals("OPEN") && !request.getAlertStatus().equals("CLOSED")) {
+            if (!"OPEN".equals(request.getAlertStatus()) && !"CLOSED".equals(request.getAlertStatus())) {
                 throw new RuntimeException("无效的告警状态: " + request.getAlertStatus());
             }
             
-            // 验证告警等级（如果提供）
-            if (request.getSeverity() != null) {
-                if (!"通知".equals(request.getSeverity()) &&
-                    !"提醒".equals(request.getSeverity()) &&
-                    !"一般".equals(request.getSeverity()) &&
-                    !"重要".equals(request.getSeverity()) &&
-                    !"致命".equals(request.getSeverity())) {
-                    throw new RuntimeException("无效的告警等级: " + request.getSeverity());
-                }
-            }
-            
-            alert.setPushStatus("SUCCESS");
-            alert.setProcessedTime(System.currentTimeMillis());
+            alert.setPushStatus(PushStatus.SUCCESS);
+            alert.setProcessedTime(LocalDateTime.now());
             
             // 根据告警状态处理系统告警
             if ("OPEN".equals(request.getAlertStatus())) {
@@ -92,9 +82,9 @@ public class ThirdPartyAlertService {
         } catch (Exception e) {
             log.error("Failed to process third-party alert from channel: {}, error: {}", 
                     request.getChannelCode(), e.getMessage(), e);
-            alert.setPushStatus("FAILED");
+            alert.setPushStatus(PushStatus.FAILED);
             alert.setFailureReason(e.getMessage());
-            alert.setProcessedTime(System.currentTimeMillis());
+            alert.setProcessedTime(LocalDateTime.now());
         }
         
         return alertRepository.save(alert);
@@ -132,9 +122,83 @@ public class ThirdPartyAlertService {
         return alertRepository.findByChannelCode(channelCode);
     }
     
-    /**
-     * 获取客户端IP地址
-     */
+    // ==================== AlertChannel CRUD ====================
+    
+    public List<AlertChannel> getAllChannels() {
+        return channelRepository.findAll();
+    }
+    
+    public Optional<AlertChannel> getChannelById(Long id) {
+        return channelRepository.findById(id);
+    }
+    
+    public AlertChannel createChannel(AlertChannel channel) {
+        if (channelRepository.existsByChannelCode(channel.getChannelCode())) {
+            throw new RuntimeException("渠道编码已存在: " + channel.getChannelCode());
+        }
+        channel.setCreatedTime(LocalDateTime.now());
+        channel.setUpdatedTime(LocalDateTime.now());
+        if (channel.getEnabled() == null) {
+            channel.setEnabled(true);
+        }
+        return channelRepository.save(channel);
+    }
+    
+    public AlertChannel updateChannel(Long id, AlertChannel channelDetails) {
+        AlertChannel channel = channelRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Channel not found with id: " + id));
+        
+        channel.setChannelName(channelDetails.getChannelName());
+        channel.setDescription(channelDetails.getDescription());
+        channel.setEnabled(channelDetails.getEnabled());
+        channel.setContactInfo(channelDetails.getContactInfo());
+        channel.setUpdatedTime(LocalDateTime.now());
+        
+        return channelRepository.save(channel);
+    }
+    
+    public void deleteChannel(Long id) {
+        channelRepository.deleteById(id);
+    }
+    
+    public List<ThirdPartyAlert> getAlertsByExternalId(String externalAlertId) {
+        return alertRepository.findByExternalAlertIdOrderByReceivedTimeDesc(externalAlertId);
+    }
+    
+    // ==================== Private Helper Methods ====================
+    
+    private ThirdPartyAlertStatus parseThirdPartyAlertStatus(String status) {
+        if ("OPEN".equalsIgnoreCase(status)) {
+            return ThirdPartyAlertStatus.OPEN;
+        } else if ("CLOSED".equalsIgnoreCase(status)) {
+            return ThirdPartyAlertStatus.CLOSED;
+        }
+        return ThirdPartyAlertStatus.OPEN;
+    }
+    
+    private Severity parseSeverity(String severity) {
+        if (severity == null) {
+            return Severity.MEDIUM;
+        }
+        switch (severity.toUpperCase()) {
+            case "LOW":
+            case "通知":
+            case "提醒":
+                return Severity.LOW;
+            case "MEDIUM":
+            case "一般":
+                return Severity.MEDIUM;
+            case "HIGH":
+            case "重要":
+                return Severity.HIGH;
+            case "CRITICAL":
+            case "致命":
+                return Severity.CRITICAL;
+            default:
+                return Severity.MEDIUM;
+        }
+    }
+    
     private String getClientIp(HttpServletRequest request) {
         String ip = request.getHeader("X-Forwarded-For");
         if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
@@ -152,12 +216,9 @@ public class ThirdPartyAlertService {
     /**
      * 创建或更新系统告警记录
      */
-    private void createOrUpdateSystemAlert(AlertChannel channel, ThirdPartyAlertRequest request, long timestamp) {
+    private void createOrUpdateSystemAlert(AlertChannel channel, ThirdPartyAlertRequest request, LocalDateTime timestamp) {
         try {
-            Alert systemAlert = null;
-            
-            // 根据外部ID查找是否已存在
-            systemAlert = systemAlertRepository.findByExternalAlertId(request.getExternalAlertId())
+            Alert systemAlert = systemAlertRepository.findByExternalAlertId(request.getExternalAlertId())
                     .orElse(null);
             
             if (systemAlert != null) {
@@ -165,11 +226,11 @@ public class ThirdPartyAlertService {
                 systemAlert.setLastTriggeredAt(timestamp);
                 systemAlert.setTriggerCount(systemAlert.getTriggerCount() + 1);
                 systemAlert.setTriggerValueText(request.getAlertContent());
-                systemAlert.setSeverity(request.getSeverity() != null ? request.getSeverity() : "提醒");
+                systemAlert.setSeverity(parseSeverity(request.getSeverity()));
                 
                 // 如果告警已经被关闭，重新激活
-                if ("RESOLVED".equals(systemAlert.getStatus())) {
-                    systemAlert.setStatus("ACTIVE");
+                if (systemAlert.getStatus() == AlertStatus.RESOLVED) {
+                    systemAlert.setStatus(AlertStatus.ACTIVE);
                     systemAlert.setResolvedAt(null);
                     systemAlert.setResolveNote(null);
                 }
@@ -180,29 +241,20 @@ public class ThirdPartyAlertService {
                 // 创建新告警
                 systemAlert = new Alert();
                 
-                // 设置告警规则信息（使用渠道信息作为规则）
                 systemAlert.setAlertRuleId(0L); // 第三方告警没有规则ID
                 systemAlert.setRuleName("[第三方] " + channel.getChannelName());
-                
-                // 代理信息使用渠道编码
                 systemAlert.setAgentId(request.getChannelCode());
                 systemAlert.setMetricType("THIRD_PARTY");
-                
-                // 告警内容
                 systemAlert.setTriggerValueText(request.getAlertContent());
-                systemAlert.setSeverity(request.getSeverity() != null ? request.getSeverity() : "提醒");
-                
-                // 外部ID
+                systemAlert.setSeverity(parseSeverity(request.getSeverity()));
                 systemAlert.setExternalAlertId(request.getExternalAlertId());
                 
-                // 自定义告警消息
                 String alertMessage = String.format("来自渠道 [%s] 的第三方告警", channel.getChannelName());
                 alertMessage += "\n外部ID: " + request.getExternalAlertId();
                 alertMessage += "\n" + request.getAlertContent();
                 systemAlert.setAlertMessage(alertMessage);
                 
-                // 设置状态和时间
-                systemAlert.setStatus("ACTIVE");
+                systemAlert.setStatus(AlertStatus.ACTIVE);
                 systemAlert.setFirstTriggeredAt(timestamp);
                 systemAlert.setLastTriggeredAt(timestamp);
                 systemAlert.setTriggerCount(1);
@@ -215,22 +267,21 @@ public class ThirdPartyAlertService {
             
         } catch (Exception e) {
             log.error("Failed to create/update system alert for third-party alert: {}", e.getMessage(), e);
-            // 不抛出异常，避免影响第三方告警记录的保存
         }
     }
     
     /**
      * 关闭系统告警
      */
-    private void closeSystemAlert(ThirdPartyAlertRequest request, long timestamp) {
+    private void closeSystemAlert(ThirdPartyAlertRequest request, LocalDateTime timestamp) {
         try {
             Optional<Alert> alertOpt = systemAlertRepository.findByExternalAlertId(request.getExternalAlertId());
             if (alertOpt.isPresent()) {
                 Alert systemAlert = alertOpt.get();
                 
-                // 只有活动状态的告警才需要关闭
-                if ("ACTIVE".equals(systemAlert.getStatus()) || "ACKNOWLEDGED".equals(systemAlert.getStatus())) {
-                    systemAlert.setStatus("RESOLVED");
+                if (systemAlert.getStatus() == AlertStatus.ACTIVE || 
+                    systemAlert.getStatus() == AlertStatus.ACKNOWLEDGED) {
+                    systemAlert.setStatus(AlertStatus.RESOLVED);
                     systemAlert.setResolvedAt(timestamp);
                     systemAlert.setResolveNote("第三方告警已关闭: " + request.getAlertContent());
                     
@@ -245,7 +296,6 @@ public class ThirdPartyAlertService {
             
         } catch (Exception e) {
             log.error("Failed to close system alert: {}", e.getMessage(), e);
-            // 不抛出异常，避免影响第三方告警记录的保存
         }
     }
 }

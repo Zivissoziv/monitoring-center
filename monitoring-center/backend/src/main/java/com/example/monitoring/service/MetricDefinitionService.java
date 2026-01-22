@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 
 import javax.script.ScriptEngine;
 import javax.script.ScriptEngineManager;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -47,8 +48,8 @@ public class MetricDefinitionService {
     }
     
     public MetricDefinition createDefinition(MetricDefinition definition) {
-        definition.setCreatedAt(System.currentTimeMillis());
-        definition.setUpdatedAt(System.currentTimeMillis());
+        definition.setCreatedAt(LocalDateTime.now());
+        definition.setUpdatedAt(LocalDateTime.now());
         MetricDefinition saved = metricDefinitionRepository.save(definition);
         
         // Auto-create configs for all existing agents if metric is enabled
@@ -73,7 +74,7 @@ public class MetricDefinitionService {
         definition.setProcessingRule(definitionDetails.getProcessingRule());
         definition.setUnit(definitionDetails.getUnit());
         definition.setEnabled(definitionDetails.getEnabled());
-        definition.setUpdatedAt(System.currentTimeMillis());
+        definition.setUpdatedAt(LocalDateTime.now());
         
         MetricDefinition saved = metricDefinitionRepository.save(definition);
         

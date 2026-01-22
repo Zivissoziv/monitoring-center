@@ -10,6 +10,7 @@ import javax.persistence.GenerationType;
 import javax.persistence.Id;
 import javax.persistence.Table;
 import javax.persistence.Transient;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -28,10 +29,10 @@ public class EmergencyKnowledge {
     private String description; // Overall description
     
     @Column(name = "created_at")
-    private long createdAt;
+    private LocalDateTime createdAt;
     
     @Column(name = "updated_at")
-    private long updatedAt;
+    private LocalDateTime updatedAt;
     
     @Transient
     private List<EmergencyStep> steps = new ArrayList<>();
@@ -42,7 +43,7 @@ public class EmergencyKnowledge {
     public EmergencyKnowledge(String title, String description) {
         this.title = title;
         this.description = description;
-        this.createdAt = System.currentTimeMillis();
-        this.updatedAt = System.currentTimeMillis();
+        this.createdAt = LocalDateTime.now();
+        this.updatedAt = LocalDateTime.now();
     }
 }

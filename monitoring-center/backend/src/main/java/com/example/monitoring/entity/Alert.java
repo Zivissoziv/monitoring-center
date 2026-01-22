@@ -1,15 +1,20 @@
 package com.example.monitoring.entity;
 
+import com.example.monitoring.enums.AlertStatus;
+import com.example.monitoring.enums.Severity;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import javax.persistence.Column;
 import javax.persistence.Entity;
+import javax.persistence.EnumType;
+import javax.persistence.Enumerated;
 import javax.persistence.GeneratedValue;
 import javax.persistence.GenerationType;
 import javax.persistence.Id;
 import javax.persistence.Table;
+import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "alerts")
@@ -35,24 +40,41 @@ public class Alert {
     private Double threshold; // For numeric rules
     @Column(name = "threshold_text")
     private String thresholdText; // For boolean/string rules
-    private String severity;
+    
+    @Enumerated(EnumType.STRING)
+    @Column(length = 20)
+    private Severity severity;
+    
     @Column(name = "alert_message", length = 1000)
     private String alertMessage; // Custom message from alert rule
-    private String status; // ACTIVE, ACKNOWLEDGED, RESOLVED
-    private long firstTriggeredAt;
-    private long lastTriggeredAt;
+    
+    @Enumerated(EnumType.STRING)
+    @Column(length = 20)
+    private AlertStatus status;
+    
+    @Column(name = "first_triggered_at")
+    private LocalDateTime firstTriggeredAt;
+    
+    @Column(name = "last_triggered_at")
+    private LocalDateTime lastTriggeredAt;
+    
     private int triggerCount;
     private String acknowledgedBy;
-    private long acknowledgedAt;
+    
+    @Column(name = "acknowledged_at")
+    private LocalDateTime acknowledgedAt;
+    
     private String resolveNote;
-    private Long resolvedAt;
+    
+    @Column(name = "resolved_at")
+    private LocalDateTime resolvedAt;
     
     @Column(name = "external_alert_id")
     private String externalAlertId; // 第三方告警的外部ID
     
     // Constructor for numeric alerts
     public Alert(Long alertRuleId, String agentId, String ruleName, String metricType, 
-                 double triggerValue, double threshold, String severity) {
+                 double triggerValue, double threshold, Severity severity) {
         this.alertRuleId = alertRuleId;
         this.agentId = agentId;
         this.ruleName = ruleName;
@@ -62,15 +84,15 @@ public class Alert {
         this.threshold = threshold;
         this.thresholdText = null;
         this.severity = severity;
-        this.status = "ACTIVE";
-        this.firstTriggeredAt = System.currentTimeMillis();
-        this.lastTriggeredAt = System.currentTimeMillis();
+        this.status = AlertStatus.ACTIVE;
+        this.firstTriggeredAt = LocalDateTime.now();
+        this.lastTriggeredAt = LocalDateTime.now();
         this.triggerCount = 1;
     }
     
     // Constructor for boolean/string alerts
     public Alert(Long alertRuleId, String agentId, String ruleName, String metricType,
-                 String triggerValueText, String thresholdText, String severity) {
+                 String triggerValueText, String thresholdText, Severity severity) {
         this.alertRuleId = alertRuleId;
         this.agentId = agentId;
         this.ruleName = ruleName;
@@ -80,9 +102,9 @@ public class Alert {
         this.threshold = null;
         this.thresholdText = thresholdText;
         this.severity = severity;
-        this.status = "ACTIVE";
-        this.firstTriggeredAt = System.currentTimeMillis();
-        this.lastTriggeredAt = System.currentTimeMillis();
+        this.status = AlertStatus.ACTIVE;
+        this.firstTriggeredAt = LocalDateTime.now();
+        this.lastTriggeredAt = LocalDateTime.now();
         this.triggerCount = 1;
     }
 }

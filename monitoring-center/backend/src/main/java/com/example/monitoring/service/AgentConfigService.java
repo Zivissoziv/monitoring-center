@@ -81,7 +81,7 @@ public class AgentConfigService {
                 MetricCollectionConfig config = new MetricCollectionConfig();
                 config.setMetricName(definition.getMetricName());
                 config.setDisplayName(definition.getDisplayName());
-                config.setMetricType(definition.getMetricType());
+                config.setMetricType(definition.getMetricType().name());
                 config.setCollectionCommand(definition.getCollectionCommand());
                 config.setCollectionInterval(customInterval != null ? customInterval : definition.getCollectionInterval());
                 config.setProcessingRule(definition.getProcessingRule());

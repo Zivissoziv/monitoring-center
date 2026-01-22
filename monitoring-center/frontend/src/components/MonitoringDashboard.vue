@@ -677,13 +677,13 @@ export default {
       if (alertFilters.value.timeRange && alertFilters.value.timeRange.length === 2) {
         const [startTime, endTime] = alertFilters.value.timeRange
         filtered = filtered.filter(alert => {
-          const lastTriggered = alert.lastTriggeredAt
+          const lastTriggered = parseTimestamp(alert.lastTriggeredAt)
           return lastTriggered >= parseInt(startTime) && lastTriggered <= parseInt(endTime)
         })
       }
       
       // Sort by last triggered time (newest first)
-      return filtered.sort((a, b) => b.lastTriggeredAt - a.lastTriggeredAt)
+      return filtered.sort((a, b) => parseTimestamp(b.lastTriggeredAt) - parseTimestamp(a.lastTriggeredAt))
     })
     
     const filteredTotal = computed(() => {
@@ -903,7 +903,7 @@ export default {
         }
         
         // Sort by timestamp descending (newest first)
-        metricsForSelectedAlert.value.sort((a, b) => b.timestamp - a.timestamp)
+        metricsForSelectedAlert.value.sort((a, b) => parseTimestamp(b.timestamp) - parseTimestamp(a.timestamp))
         
         // Render chart if in chart view mode
         if (metricViewMode.value === 'chart') {
@@ -1260,13 +1260,23 @@ export default {
       }
     }
     
+    // Helper function to parse timestamp (handles both ISO string and milliseconds)
+    const parseTimestamp = (timestamp) => {
+      if (typeof timestamp === 'string') {
+        return new Date(timestamp).getTime()
+      }
+      return timestamp
+    }
+    
     const formatTime = (timestamp) => {
       if (!timestamp) return '-'
-      return new Date(timestamp).toLocaleString('zh-CN')
+      // Handle both ISO string and milliseconds
+      const date = typeof timestamp === 'string' ? new Date(timestamp) : new Date(timestamp)
+      return date.toLocaleString('zh-CN')
     }
     
     const formatTimeShort = (timestamp) => {
-      const date = new Date(timestamp)
+      const date = typeof timestamp === 'string' ? new Date(timestamp) : new Date(timestamp)
       return date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
     }
     

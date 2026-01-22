@@ -1,6 +1,7 @@
 package com.example.monitoring.service;
 
 import com.example.monitoring.entity.Agent;
+import com.example.monitoring.enums.AgentStatus;
 import com.example.monitoring.repository.AgentRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -36,7 +37,7 @@ public class AgentService {
     
     public Agent createAgent(Agent agent) {
         // Set initial status
-        agent.setStatus("INACTIVE");
+        agent.setStatus(AgentStatus.INACTIVE);
         Agent savedAgent = agentRepository.save(agent);
         
         // Initialize default metric configs for this agent
@@ -76,13 +77,13 @@ public class AgentService {
             ResponseEntity<Map> response = restTemplate.getForEntity(url, Map.class);
             
             if (response.getStatusCode() == HttpStatus.OK) {
-                agent.setStatus("ACTIVE");
+                agent.setStatus(AgentStatus.ACTIVE);
             } else {
-                agent.setStatus("DISCONNECTED");
+                agent.setStatus(AgentStatus.DISCONNECTED);
             }
         } catch (Exception e) {
             log.error("Failed to check agent health for {}: {}", agent.getId(), e.getMessage(), e);
-            agent.setStatus("DISCONNECTED");
+            agent.setStatus(AgentStatus.DISCONNECTED);
         }
         agentRepository.save(agent);
     }

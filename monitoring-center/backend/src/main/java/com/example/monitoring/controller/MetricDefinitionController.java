@@ -2,18 +2,11 @@ package com.example.monitoring.controller;
 
 import com.example.monitoring.entity.MetricDefinition;
 import com.example.monitoring.service.MetricDefinitionService;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.CrossOrigin;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
@@ -21,19 +14,19 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/metric-definitions")
 @CrossOrigin(origins = "*")
+@RequiredArgsConstructor
 public class MetricDefinitionController {
     
-    @Autowired
-    private MetricDefinitionService metricDefinitionService;
+    private final MetricDefinitionService metricDefinitionService;
     
     @GetMapping
-    public List<MetricDefinition> getAllDefinitions() {
-        return metricDefinitionService.getAllDefinitions();
+    public ResponseEntity<List<MetricDefinition>> getAllDefinitions() {
+        return ResponseEntity.ok(metricDefinitionService.getAllDefinitions());
     }
     
     @GetMapping("/enabled")
-    public List<MetricDefinition> getEnabledDefinitions() {
-        return metricDefinitionService.getEnabledDefinitions();
+    public ResponseEntity<List<MetricDefinition>> getEnabledDefinitions() {
+        return ResponseEntity.ok(metricDefinitionService.getEnabledDefinitions());
     }
     
     @GetMapping("/{id}")
@@ -51,8 +44,9 @@ public class MetricDefinitionController {
     }
     
     @PostMapping
-    public MetricDefinition createDefinition(@RequestBody MetricDefinition definition) {
-        return metricDefinitionService.createDefinition(definition);
+    public ResponseEntity<MetricDefinition> createDefinition(@RequestBody MetricDefinition definition) {
+        MetricDefinition created = metricDefinitionService.createDefinition(definition);
+        return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
     
     @PutMapping("/{id}")

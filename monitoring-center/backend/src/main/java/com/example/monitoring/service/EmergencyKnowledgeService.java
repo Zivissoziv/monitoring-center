@@ -10,6 +10,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -79,7 +80,7 @@ public class EmergencyKnowledgeService {
                 EmergencyKnowledge existing = existingOpt.get();
                 existing.setTitle(knowledge.getTitle());
                 existing.setDescription(knowledge.getDescription());
-                existing.setUpdatedAt(System.currentTimeMillis());
+                existing.setUpdatedAt(LocalDateTime.now());
                 savedKnowledge = knowledgeRepository.save(existing);
                 
                 // Delete old steps
@@ -89,8 +90,8 @@ public class EmergencyKnowledgeService {
             }
         } else {
             // Create new
-            knowledge.setCreatedAt(System.currentTimeMillis());
-            knowledge.setUpdatedAt(System.currentTimeMillis());
+            knowledge.setCreatedAt(LocalDateTime.now());
+            knowledge.setUpdatedAt(LocalDateTime.now());
             savedKnowledge = knowledgeRepository.save(knowledge);
         }
         

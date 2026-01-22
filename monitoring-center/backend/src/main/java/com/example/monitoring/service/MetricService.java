@@ -4,31 +4,26 @@ import com.example.monitoring.entity.Agent;
 import com.example.monitoring.entity.Metric;
 import com.example.monitoring.repository.AgentRepository;
 import com.example.monitoring.repository.MetricRepository;
-import com.example.monitoring.service.AlertService;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
+@RequiredArgsConstructor
 public class MetricService {
     
-    @Autowired
-    private MetricRepository metricRepository;
-    
-    @Autowired
-    private AgentRepository agentRepository;
-    
-    @Autowired
-    private AlertService alertService;
+    private final MetricRepository metricRepository;
+    private final AgentRepository agentRepository;
+    private final AlertService alertService;
     
     public List<Metric> getAllMetrics() {
-        return metricRepository.findAllByOrderByTimestampDesc(org.springframework.data.domain.Pageable.unpaged()).getContent();
+        return metricRepository.findAllByOrderByTimestampDesc(Pageable.unpaged()).getContent();
     }
     
-    // Add paginated method
     public Page<Metric> getAllMetrics(Pageable pageable) {
         return metricRepository.findAllByOrderByTimestampDesc(pageable);
     }
@@ -37,7 +32,6 @@ public class MetricService {
         return metricRepository.findByAgentIdOrderByTimestampDesc(agentId);
     }
     
-    // Add paginated method
     public Page<Metric> getMetricsByAgentId(String agentId, Pageable pageable) {
         return metricRepository.findByAgentIdOrderByTimestampDesc(agentId, pageable);
     }
@@ -46,25 +40,23 @@ public class MetricService {
         return metricRepository.findByAgentIdAndMetricTypeOrderByTimestampDesc(agentId, metricType);
     }
     
-    // Add paginated method
     public Page<Metric> getMetricsByAgentIdAndType(String agentId, String metricType, Pageable pageable) {
         return metricRepository.findByAgentIdAndMetricTypeOrderByTimestampDesc(agentId, metricType, pageable);
     }
     
-    // Add time range query methods
-    public List<Metric> getMetricsByAgentIdAndTimeRange(String agentId, Long startTime, Long endTime) {
+    public List<Metric> getMetricsByAgentIdAndTimeRange(String agentId, LocalDateTime startTime, LocalDateTime endTime) {
         return metricRepository.findByAgentIdAndTimestampBetweenOrderByTimestampDesc(agentId, startTime, endTime);
     }
     
-    public List<Metric> getMetricsByAgentIdAndTypeAndTimeRange(String agentId, String metricType, Long startTime, Long endTime) {
+    public List<Metric> getMetricsByAgentIdAndTypeAndTimeRange(String agentId, String metricType, LocalDateTime startTime, LocalDateTime endTime) {
         return metricRepository.findByAgentIdAndMetricTypeAndTimestampBetweenOrderByTimestampDesc(agentId, metricType, startTime, endTime);
     }
     
-    public Page<Metric> getMetricsByAgentIdAndTimeRange(String agentId, Long startTime, Long endTime, Pageable pageable) {
+    public Page<Metric> getMetricsByAgentIdAndTimeRange(String agentId, LocalDateTime startTime, LocalDateTime endTime, Pageable pageable) {
         return metricRepository.findByAgentIdAndTimestampBetweenOrderByTimestampDesc(agentId, startTime, endTime, pageable);
     }
     
-    public Page<Metric> getMetricsByAgentIdAndTypeAndTimeRange(String agentId, String metricType, Long startTime, Long endTime, Pageable pageable) {
+    public Page<Metric> getMetricsByAgentIdAndTypeAndTimeRange(String agentId, String metricType, LocalDateTime startTime, LocalDateTime endTime, Pageable pageable) {
         return metricRepository.findByAgentIdAndMetricTypeAndTimestampBetweenOrderByTimestampDesc(agentId, metricType, startTime, endTime, pageable);
     }
     

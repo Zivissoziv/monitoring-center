@@ -10,6 +10,7 @@ import javax.persistence.GeneratedValue;
 import javax.persistence.GenerationType;
 import javax.persistence.Id;
 import javax.persistence.Table;
+import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "metrics")
@@ -31,14 +32,15 @@ public class Metric {
     @Column(name = "text_value")
     private String textValue; // For string-type metrics
     
-    private long timestamp;
+    @Column(name = "timestamp")
+    private LocalDateTime timestamp;
     
     public Metric(String agentId, String metricType, double value) {
         this.agentId = agentId;
         this.metricType = metricType;
         this.value = value;
         this.textValue = null;
-        this.timestamp = System.currentTimeMillis();
+        this.timestamp = LocalDateTime.now();
     }
     
     public Metric(String agentId, String metricType, String textValue) {
@@ -46,6 +48,6 @@ public class Metric {
         this.metricType = metricType;
         this.value = 0.0;
         this.textValue = textValue;
-        this.timestamp = System.currentTimeMillis();
+        this.timestamp = LocalDateTime.now();
     }
 }

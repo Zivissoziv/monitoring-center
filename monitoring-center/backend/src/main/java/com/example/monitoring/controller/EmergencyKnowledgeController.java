@@ -2,40 +2,35 @@ package com.example.monitoring.controller;
 
 import com.example.monitoring.entity.EmergencyKnowledge;
 import com.example.monitoring.service.EmergencyKnowledgeService;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.CrossOrigin;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
 @RestController
 @RequestMapping("/api/emergency")
 @CrossOrigin(origins = "*")
+@RequiredArgsConstructor
 public class EmergencyKnowledgeController {
 
-    @Autowired
-    private EmergencyKnowledgeService knowledgeService;
+    private final EmergencyKnowledgeService knowledgeService;
 
     @GetMapping
-    public List<EmergencyKnowledge> getAllKnowledge() {
-        return knowledgeService.getAllKnowledge();
+    public ResponseEntity<List<EmergencyKnowledge>> getAllKnowledge() {
+        return ResponseEntity.ok(knowledgeService.getAllKnowledge());
     }
 
     @GetMapping("/alert-rule/{alertRuleId}")
-    public List<EmergencyKnowledge> getKnowledgeByAlertRuleId(@PathVariable Long alertRuleId) {
-        return knowledgeService.getKnowledgeByAlertRuleId(alertRuleId);
+    public ResponseEntity<List<EmergencyKnowledge>> getKnowledgeByAlertRuleId(@PathVariable Long alertRuleId) {
+        return ResponseEntity.ok(knowledgeService.getKnowledgeByAlertRuleId(alertRuleId));
     }
 
     @PostMapping
-    public EmergencyKnowledge createOrUpdateKnowledge(@RequestBody EmergencyKnowledge knowledge) {
-        return knowledgeService.createOrUpdateKnowledge(knowledge);
+    public ResponseEntity<EmergencyKnowledge> createOrUpdateKnowledge(@RequestBody EmergencyKnowledge knowledge) {
+        EmergencyKnowledge saved = knowledgeService.createOrUpdateKnowledge(knowledge);
+        return ResponseEntity.status(knowledge.getId() == null ? HttpStatus.CREATED : HttpStatus.OK).body(saved);
     }
 
     @DeleteMapping("/{id}")

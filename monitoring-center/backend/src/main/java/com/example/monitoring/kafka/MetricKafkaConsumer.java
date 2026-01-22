@@ -11,6 +11,10 @@ import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.stereotype.Component;
 
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+
 /**
  * Kafka consumer for receiving metrics from agents
  */
@@ -38,7 +42,14 @@ public class MetricKafkaConsumer {
             metric.setMetricType(metricData.getMetricType());
             metric.setValue(metricData.getMetricValue());
             metric.setTextValue(metricData.getTextValue());
-            metric.setTimestamp(metricData.getTimestamp());
+            // Convert Long timestamp (millis) to LocalDateTime
+            if (metricData.getTimestamp() != null) {
+                metric.setTimestamp(LocalDateTime.ofInstant(
+                    Instant.ofEpochMilli(metricData.getTimestamp()), 
+                    ZoneId.systemDefault()));
+            } else {
+                metric.setTimestamp(LocalDateTime.now());
+            }
             
             // Save to database and trigger alert check
             metricService.saveMetric(metric);

@@ -264,7 +264,7 @@ export default {
       
       try {
         // Use backend API to test connection (avoid CORS issues)
-        const response = await fetch('/api/agents/test-connection', {
+        const response = await fetch('/api/agents/connection-test', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
@@ -382,7 +382,7 @@ export default {
           // Auto push configuration to the new agent
           ElMessage.info('正在推送采集配置到新代理...')
           try {
-            await fetch(`/api/agents/${agent.id}/push-config`, {
+            await fetch(`/api/agents/${agent.id}/config`, {
               method: 'POST'
             })
             ElMessage.success('采集配置已推送到代理')
@@ -443,7 +443,7 @@ export default {
       this.$set(this.pushingConfig, agentId, true)
       
       try {
-        const response = await fetch(`/api/agents/${agentId}/push-config`, {
+        const response = await fetch(`/api/agents/${agentId}/config`, {
           method: 'POST'
         })
         
@@ -465,7 +465,7 @@ export default {
       this.pushingAll = true
       
       try {
-        const response = await fetch('/api/agents/push-config-all', {
+        const response = await fetch('/api/agents/config/batch-push', {
           method: 'POST'
         })
         
