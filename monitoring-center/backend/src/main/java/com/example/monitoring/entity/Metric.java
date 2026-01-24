@@ -24,6 +24,10 @@ public class Metric {
     
     @Column(name = "agent_id")
     private String agentId;
+    
+    @Column(name = "app_code", length = 10)
+    private String appCode;
+    
     private String metricType; // CPU, MEMORY, etc.
     
     @Column(name = "metric_value")
@@ -37,6 +41,7 @@ public class Metric {
     
     public Metric(String agentId, String metricType, double value) {
         this.agentId = agentId;
+        this.appCode = null;
         this.metricType = metricType;
         this.value = value;
         this.textValue = null;
@@ -45,6 +50,25 @@ public class Metric {
     
     public Metric(String agentId, String metricType, String textValue) {
         this.agentId = agentId;
+        this.appCode = null;
+        this.metricType = metricType;
+        this.value = 0.0;
+        this.textValue = textValue;
+        this.timestamp = LocalDateTime.now();
+    }
+    
+    public Metric(String agentId, String appCode, String metricType, double value) {
+        this.agentId = agentId;
+        this.appCode = appCode;
+        this.metricType = metricType;
+        this.value = value;
+        this.textValue = null;
+        this.timestamp = LocalDateTime.now();
+    }
+    
+    public Metric(String agentId, String appCode, String metricType, String textValue) {
+        this.agentId = agentId;
+        this.appCode = appCode;
         this.metricType = metricType;
         this.value = 0.0;
         this.textValue = textValue;

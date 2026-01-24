@@ -27,6 +27,9 @@ public class Agent {
     private String ip;
     private int port;
     
+    @Column(name = "app_code", length = 10)
+    private String appCode;
+    
     @Enumerated(EnumType.STRING)
     @Column(length = 20)
     private AgentStatus status;
@@ -41,6 +44,17 @@ public class Agent {
         this.name = name;
         this.ip = ip;
         this.port = port;
+        this.appCode = null;
+        this.status = AgentStatus.INACTIVE;
+        this.createdAt = LocalDateTime.now();
+        this.updatedAt = LocalDateTime.now();
+    }
+    
+    public Agent(String name, String ip, int port, String appCode) {
+        this.name = name;
+        this.ip = ip;
+        this.port = port;
+        this.appCode = appCode;
         this.status = AgentStatus.INACTIVE;
         this.createdAt = LocalDateTime.now();
         this.updatedAt = LocalDateTime.now();

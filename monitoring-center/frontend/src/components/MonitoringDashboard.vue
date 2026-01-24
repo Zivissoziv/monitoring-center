@@ -38,6 +38,16 @@
     <!-- Search and Filter Bar -->
     <el-card shadow="hover" style="margin-bottom: 20px;">
       <el-form :inline="true" :model="alertFilters">
+        <el-form-item label="所属应用">
+          <el-select v-model="alertFilters.appCode" placeholder="全部" clearable style="width: 150px">
+            <el-option 
+              v-for="app in apps" 
+              :key="app.appCode" 
+              :label="`${app.appCode} - ${app.appName}`" 
+              :value="app.appCode"
+            />
+          </el-select>
+        </el-form-item>
         <el-form-item label="状态">
           <el-select v-model="alertFilters.status" placeholder="全部" clearable style="width: 120px">
             <el-option label="打开" value="ACTIVE" />
@@ -99,19 +109,20 @@
       </template>
       <el-table :data="paginatedAlerts" stripe style="width: 100%" v-loading="loading">
         <el-table-column prop="id" label="ID" width="80" />
-        <el-table-column label="告警信息" min-width="250">
+        <el-table-column label="所属应用" width="120">
+          <template #default="scope">
+            <el-tag v-if="scope.row.appCode" type="primary" size="small">
+              {{ getAppName(scope.row.appCode) }}
+            </el-tag>
+            <span v-else style="color: #909399">无</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="告警信息" min-width="300">
           <template #default="scope">
             <div style="color: #606266; font-weight: 500;">
               <el-icon style="margin-right: 5px; color: #f56c6c;"><InfoFilled /></el-icon>
               {{ getDisplayAlertMessage(scope.row) || scope.row.ruleName }}
             </div>
-          </template>
-        </el-table-column>
-        <el-table-column label="指标类型" width="150">
-          <template #default="scope">
-            <el-tag :type="scope.row.metricType === 'CPU' ? 'danger' : 'primary'" size="small">
-              {{ getMetricTypeName(scope.row.metricType) }}
-            </el-tag>
           </template>
         </el-table-column>
         <el-table-column label="来源渠道" min-width="150">
@@ -183,10 +194,19 @@
           </template>
           <el-descriptions :column="2" size="small" border>
             <el-descriptions-item label="告警ID">{{ selectedAlert.id }}</el-descriptions-item>
+            <el-descriptions-item label="所属应用">
+              <el-tag v-if="selectedAlert.appCode" type="primary" size="small">
+                {{ getAppName(selectedAlert.appCode) }}
+              </el-tag>
+              <span v-else style="color: #909399">无</span>
+            </el-descriptions-item>
             <el-descriptions-item label="指标类型">
               <el-tag :type="selectedAlert.metricType === 'CPU' ? 'danger' : 'primary'" size="small">
                 {{ getMetricTypeName(selectedAlert.metricType) }}
               </el-tag>
+            </el-descriptions-item>
+            <el-descriptions-item label="来源渠道">
+              {{ getAlertSource(selectedAlert) || '-' }}
             </el-descriptions-item>
             <el-descriptions-item label="外部ID" v-if="selectedAlert.externalAlertId" :span="2">
               <el-tag type="info" size="small">{{ selectedAlert.externalAlertId }}</el-tag>
@@ -196,9 +216,6 @@
                 <el-icon style="margin-right: 5px; color: #f56c6c;"><InfoFilled /></el-icon>
                 {{ getDisplayAlertMessage(selectedAlert) || selectedAlert.ruleName }}
               </div>
-            </el-descriptions-item>
-            <el-descriptions-item label="来源渠道">
-              {{ getAlertSource(selectedAlert) || '-' }}
             </el-descriptions-item>
             <el-descriptions-item label="触发值">
               {{ formatAlertValue(selectedAlert) }}
@@ -593,10 +610,12 @@ export default {
   setup() {
     const alerts = ref([])
     const agents = ref([])
+    const apps = ref([])
     const metricDefinitions = ref([])
     const loading = ref(false)
     const refreshInterval = ref(null)
     const alertFilters = ref({
+      appCode: '',
       agentIp: '',
       severity: '',
       metricType: '',
@@ -649,6 +668,11 @@ export default {
     const filteredAlerts = computed(() => {
       // Apply all filters
       let filtered = alerts.value
+      
+      // Filter by app code
+      if (alertFilters.value.appCode) {
+        filtered = filtered.filter(alert => alert.appCode === alertFilters.value.appCode)
+      }
       
       // Filter by status
       if (alertFilters.value.status) {
@@ -823,6 +847,23 @@ export default {
     }
     
     // Methods
+    const loadApps = async () => {
+      try {
+        const response = await fetch('/api/apps/enabled')
+        const result = await response.json()
+        if (result.success) {
+          apps.value = result.data || []
+        }
+      } catch (error) {
+        console.error('Error loading apps:', error)
+      }
+    }
+    
+    const getAppName = (appCode) => {
+      const app = apps.value.find(a => a.appCode === appCode)
+      return app ? appCode : appCode
+    }
+    
     const loadData = async () => {
       loading.value = true
       try {
@@ -837,6 +878,9 @@ export default {
         // Load metric definitions
         const metricDefsResponse = await fetch('/api/metric-definitions')
         metricDefinitions.value = await metricDefsResponse.json()
+        
+        // Load apps
+        await loadApps()
       } catch (error) {
         console.error('Error loading dashboard data:', error)
         ElMessage.error('加载数据失败')
@@ -857,6 +901,7 @@ export default {
     
     const clearFilters = () => {
       alertFilters.value = {
+        appCode: '',
         agentIp: '',
         severity: '',
         metricType: '',
@@ -1515,6 +1560,7 @@ export default {
       // Reactive data
       alerts,
       agents,
+      apps,
       metricDefinitions,
       alertFilters,
       pagination,
@@ -1563,6 +1609,7 @@ export default {
       getMetricTypeName,
       getSeverityText,
       getAgentName,
+      getAppName,
       formatValue,
       formatAlertValue,
       formatThresholdValue,

@@ -32,6 +32,9 @@ public class Alert {
     @Column(name = "agent_id")
     private String agentId;
     
+    @Column(name = "app_code", length = 10)
+    private String appCode;
+    
     private String ruleName;
     private String metricType;
     private Double triggerValue; // For numeric metrics
@@ -77,6 +80,7 @@ public class Alert {
                  double triggerValue, double threshold, Severity severity) {
         this.alertRuleId = alertRuleId;
         this.agentId = agentId;
+        this.appCode = null;
         this.ruleName = ruleName;
         this.metricType = metricType;
         this.triggerValue = triggerValue;
@@ -95,6 +99,7 @@ public class Alert {
                  String triggerValueText, String thresholdText, Severity severity) {
         this.alertRuleId = alertRuleId;
         this.agentId = agentId;
+        this.appCode = null;
         this.ruleName = ruleName;
         this.metricType = metricType;
         this.triggerValue = null;

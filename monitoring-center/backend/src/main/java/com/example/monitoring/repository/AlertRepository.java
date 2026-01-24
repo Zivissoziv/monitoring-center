@@ -28,4 +28,11 @@ public interface AlertRepository extends JpaRepository<Alert, Long> {
     
     // Find alert by external alert ID (for third-party alerts)
     Optional<Alert> findByExternalAlertId(String externalAlertId);
+    
+    // Filter by app code
+    List<Alert> findByAppCodeIn(List<String> appCodes);
+    
+    List<Alert> findByAppCodeInAndStatusOrderByLastTriggeredAtDesc(List<String> appCodes, AlertStatus status);
+    
+    List<Alert> findByAppCodeInAndStatusInOrderByLastTriggeredAtDesc(List<String> appCodes, List<AlertStatus> statuses);
 }

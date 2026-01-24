@@ -61,9 +61,12 @@ public class MetricService {
     }
     
     public Metric saveMetric(Metric metric) {
-        // Check if agent exists
+        // Check if agent exists and set appCode from agent
         Agent agent = agentRepository.findById(metric.getAgentId())
                 .orElseThrow(() -> new RuntimeException("Agent not found with id: " + metric.getAgentId()));
+        
+        // Set appCode from agent
+        metric.setAppCode(agent.getAppCode());
         
         Metric savedMetric = metricRepository.save(metric);
         
@@ -74,6 +77,12 @@ public class MetricService {
     }
     
     public List<Metric> saveMetrics(List<Metric> metrics) {
+        // Set appCode for each metric from agent
+        for (Metric metric : metrics) {
+            agentRepository.findById(metric.getAgentId())
+                    .ifPresent(agent -> metric.setAppCode(agent.getAppCode()));
+        }
+        
         List<Metric> savedMetrics = metricRepository.saveAll(metrics);
         
         // Check if any alerts should be triggered for each metric
@@ -82,5 +91,27 @@ public class MetricService {
         }
         
         return savedMetrics;
+    }
+    
+    // Filter metrics by accessible app codes
+    public List<Metric> getMetricsByAppCodes(List<String> appCodes) {
+        if (appCodes == null || appCodes.isEmpty()) {
+            return getAllMetrics();
+        }
+        return metricRepository.findByAppCodeInOrderByTimestampDesc(appCodes, Pageable.unpaged()).getContent();
+    }
+    
+    public Page<Metric> getMetricsByAppCodes(List<String> appCodes, Pageable pageable) {
+        if (appCodes == null || appCodes.isEmpty()) {
+            return metricRepository.findAllByOrderByTimestampDesc(pageable);
+        }
+        return metricRepository.findByAppCodeInOrderByTimestampDesc(appCodes, pageable);
+    }
+    
+    public Page<Metric> getMetricsByAppCodesAndAgentId(List<String> appCodes, String agentId, Pageable pageable) {
+        if (appCodes == null || appCodes.isEmpty()) {
+            return metricRepository.findByAgentIdOrderByTimestampDesc(agentId, pageable);
+        }
+        return metricRepository.findByAppCodeInAndAgentIdOrderByTimestampDesc(appCodes, agentId, pageable);
     }
 }

@@ -2,6 +2,7 @@ package com.example.monitoring.controller;
 
 import com.example.monitoring.entity.Alert;
 import com.example.monitoring.enums.AlertStatus;
+import com.example.monitoring.security.FilterByUserApp;
 import com.example.monitoring.service.AlertService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -24,16 +25,19 @@ public class AlertMonitorController {
     private final AlertService alertService;
     
     @GetMapping
+    @FilterByUserApp
     public ResponseEntity<List<Alert>> getAllAlerts() {
         return ResponseEntity.ok(alertService.getAllAlerts());
     }
     
     @GetMapping("/active")
+    @FilterByUserApp
     public ResponseEntity<List<Alert>> getActiveAlerts() {
         return ResponseEntity.ok(alertService.getActiveAlerts());
     }
     
     @GetMapping("/status/{status}")
+    @FilterByUserApp
     public ResponseEntity<List<Alert>> getAlertsByStatus(@PathVariable String status) {
         try {
             AlertStatus alertStatus = AlertStatus.valueOf(status.toUpperCase());

@@ -1,5 +1,6 @@
 package com.example.monitoring.service;
 
+import com.example.monitoring.entity.Agent;
 import com.example.monitoring.entity.Alert;
 import com.example.monitoring.entity.AlertRule;
 import com.example.monitoring.entity.Metric;
@@ -7,6 +8,7 @@ import com.example.monitoring.entity.MetricDefinition;
 import com.example.monitoring.enums.AlertCondition;
 import com.example.monitoring.enums.AlertStatus;
 import com.example.monitoring.enums.MetricValueType;
+import com.example.monitoring.repository.AgentRepository;
 import com.example.monitoring.repository.AlertRepository;
 import com.example.monitoring.repository.AlertRuleRepository;
 import com.example.monitoring.repository.MetricDefinitionRepository;
@@ -29,6 +31,7 @@ public class AlertService {
     private final AlertRepository alertRepository;
     private final MetricRepository metricRepository;
     private final MetricDefinitionRepository metricDefinitionRepository;
+    private final AgentRepository agentRepository;
 
     // ==================== AlertRule CRUD ====================
     
@@ -285,6 +288,15 @@ public class AlertService {
                 );
                 alert.setAlertMessage(rule.getAlertMessage());
             }
+            
+            // Set appCode from metric or agent
+            if (metric.getAppCode() != null) {
+                alert.setAppCode(metric.getAppCode());
+            } else {
+                agentRepository.findById(metric.getAgentId())
+                        .ifPresent(agent -> alert.setAppCode(agent.getAppCode()));
+            }
+            
             alertRepository.save(alert);
         }
     }
@@ -330,5 +342,28 @@ public class AlertService {
                 .orElseThrow(() -> new RuntimeException("Alert not found with id: " + alertId));
 
         alertRepository.delete(alert);
+    }
+    
+    // ==================== Filter by App Codes ====================
+    
+    public List<Alert> getAlertsByAppCodes(List<String> appCodes) {
+        if (appCodes == null || appCodes.isEmpty()) {
+            return alertRepository.findAll();
+        }
+        return alertRepository.findByAppCodeIn(appCodes);
+    }
+    
+    public List<Alert> getActiveAlertsByAppCodes(List<String> appCodes) {
+        if (appCodes == null || appCodes.isEmpty()) {
+            return alertRepository.findByStatusOrderByLastTriggeredAtDesc(AlertStatus.ACTIVE);
+        }
+        return alertRepository.findByAppCodeInAndStatusOrderByLastTriggeredAtDesc(appCodes, AlertStatus.ACTIVE);
+    }
+    
+    public List<Alert> getAlertsByAppCodesAndStatuses(List<String> appCodes, List<AlertStatus> statuses) {
+        if (appCodes == null || appCodes.isEmpty()) {
+            return alertRepository.findByStatusIn(statuses);
+        }
+        return alertRepository.findByAppCodeInAndStatusInOrderByLastTriggeredAtDesc(appCodes, statuses);
     }
 }

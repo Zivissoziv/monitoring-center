@@ -4,6 +4,16 @@
     <!-- Search and Filter Bar -->
     <el-card shadow="hover" style="margin-bottom: 20px;">
       <el-form :inline="true" :model="searchForm">
+        <el-form-item label="所属应用">
+          <el-select v-model="searchForm.appCode" placeholder="全部" clearable style="width: 150px">
+            <el-option 
+              v-for="app in apps" 
+              :key="app.appCode" 
+              :label="`${app.appCode} - ${app.appName}`" 
+              :value="app.appCode"
+            />
+          </el-select>
+        </el-form-item>
         <el-form-item label="指标类型">
           <el-select v-model="searchForm.metricType" placeholder="全部" clearable style="width: 150px">
             <el-option 
@@ -67,6 +77,14 @@
       </template>
       <el-table :data="paginatedMetrics" stripe style="width: 100%">
         <el-table-column prop="id" label="ID" width="80" />
+        <el-table-column label="所属应用" width="120">
+          <template #default="scope">
+            <el-tag v-if="scope.row.appCode" type="primary" size="small">
+              {{ getAppName(scope.row.appCode) }}
+            </el-tag>
+            <span v-else style="color: #909399">无</span>
+          </template>
+        </el-table-column>
         <el-table-column label="代理" width="150">
           <template #default="scope">
             {{ getAgentName(scope.row.agentId) }}
@@ -164,8 +182,10 @@ export default {
       filteredMetrics: [],
       metricDefinitions: [],
       agents: [],
+      apps: [],
       loading: false,
       searchForm: {
+        appCode: '',
         metricType: '',
         agentId: '',
         timeRange: null
@@ -260,6 +280,7 @@ export default {
   mounted() {
     this.loadAgents()
     this.loadMetricDefinitions()
+    this.loadApps()
     this.loadAllData()
     // Removed auto-refresh
   },
@@ -349,6 +370,11 @@ export default {
               })
             }
             
+            // Apply appCode filter if set
+            if (this.searchForm.appCode) {
+              filtered = filtered.filter(m => m.appCode === this.searchForm.appCode)
+            }
+            
             this.metrics = filtered
             this.totalMetrics = filtered.length
             
@@ -378,6 +404,12 @@ export default {
           this.totalMetrics = data.length
         }
         
+        // Apply appCode filter if set (frontend filtering)
+        if (this.searchForm.appCode) {
+          this.filteredMetrics = this.filteredMetrics.filter(m => m.appCode === this.searchForm.appCode)
+          this.totalMetrics = this.filteredMetrics.length
+        }
+        
         // Sort by timestamp descending (newest first)
         this.filteredMetrics.sort((a, b) => this.parseTimestamp(b.timestamp) - this.parseTimestamp(a.timestamp))
       } catch (error) {
@@ -402,6 +434,7 @@ export default {
     
     handleReset() {
       this.searchForm = {
+        appCode: '',
         metricType: '',
         agentId: '',
         timeRange: null
@@ -684,6 +717,23 @@ export default {
     getAgentName(agentId) {
       const agent = this.agents.find(a => a.id === agentId)
       return agent ? agent.name : agentId
+    },
+    
+    async loadApps() {
+      try {
+        const response = await fetch('/api/apps/enabled')
+        const result = await response.json()
+        if (result.success) {
+          this.apps = result.data || []
+        }
+      } catch (error) {
+        console.error('Error loading apps:', error)
+      }
+    },
+    
+    getAppName(appCode) {
+      const app = this.apps.find(a => a.appCode === appCode)
+      return app ? appCode : appCode
     }
   }
 }

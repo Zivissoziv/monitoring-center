@@ -43,7 +43,7 @@
             </el-sub-menu>
             
             <!-- 系统管理 -->
-            <el-sub-menu v-if="hasAnyMenu(['users', 'roles', 'agents', 'metric-definitions'])" index="system">
+            <el-sub-menu v-if="hasAnyMenu(['users', 'roles', 'agents', 'metric-definitions', 'apps'])" index="system">
               <template #title>
                 <el-icon><Tools /></el-icon>
                 <span>系统管理</span>
@@ -55,6 +55,10 @@
               <el-menu-item v-if="hasMenu('metric-definitions')" index="metric-definitions">
                 <el-icon><Setting /></el-icon>
                 <span>指标定义</span>
+              </el-menu-item>
+              <el-menu-item v-if="hasMenu('apps')" index="apps">
+                <el-icon><Grid /></el-icon>
+                <span>应用管理</span>
               </el-menu-item>
               <el-menu-item v-if="hasMenu('users')" index="users">
                 <el-icon><User /></el-icon>
@@ -96,6 +100,7 @@
         <ThirdPartyAlerts v-if="activeTab === 'third-party'" />
         <UserManagement v-if="activeTab === 'users'" />
         <RoleManagement v-if="activeTab === 'roles'" />
+        <AppManagement v-if="activeTab === 'apps'" />
       </el-main>
     </el-container>
   </div>
@@ -106,7 +111,7 @@ import { ref, computed, onMounted } from 'vue'
 import { 
   User, ArrowDown, SwitchButton, Monitor, DataBoard, TrendCharts, 
   Bell, Reading, Setting, Connection, UserFilled, Tools, Warning,
-  Cpu, Avatar
+  Cpu, Avatar, Grid
 } from '@element-plus/icons-vue'
 import { useUserStore } from './stores/user'
 import Login from './components/Login.vue'
@@ -119,6 +124,7 @@ import EmergencyKnowledge from './components/EmergencyKnowledge.vue'
 import ThirdPartyAlerts from './components/ThirdPartyAlerts.vue'
 import UserManagement from './components/UserManagement.vue'
 import RoleManagement from './components/RoleManagement.vue'
+import AppManagement from './components/AppManagement.vue'
 
 export default {
   name: 'App',
@@ -138,6 +144,7 @@ export default {
     Warning,
     Cpu,
     Avatar,
+    Grid,
     Login,
     MonitoringDashboard,
     AgentManagement,
@@ -147,7 +154,8 @@ export default {
     EmergencyKnowledge,
     ThirdPartyAlerts,
     UserManagement,
-    RoleManagement
+    RoleManagement,
+    AppManagement
   },
   setup() {
     const userStore = useUserStore()
@@ -248,6 +256,7 @@ body {
   align-items: center;
   gap: 12px;
   padding: 15px 0;
+  margin-right: 40px;
   cursor: pointer;
 }
 

@@ -54,6 +54,14 @@
         <el-table-column prop="name" label="名称" min-width="150" />
         <el-table-column prop="ip" label="IP地址" min-width="150" />
         <el-table-column prop="port" label="端口" width="100" />
+        <el-table-column prop="appCode" label="所属应用" width="120">
+          <template #default="scope">
+            <el-tag v-if="scope.row.appCode" type="primary" size="small">
+              {{ getAppName(scope.row.appCode) }}
+            </el-tag>
+            <span v-else style="color: #909399">无</span>
+          </template>
+        </el-table-column>
         <el-table-column label="状态" width="120">
           <template #default="scope">
             <el-tag :type="getStatusType(scope.row.status)" size="small">
@@ -129,6 +137,19 @@
         <el-form-item label="端口" required>
           <el-input-number v-model="newAgent.port" :min="1" :max="65535" style="width: 100%" />
         </el-form-item>
+        <el-form-item label="所属应用" required>
+          <el-select v-model="newAgent.appCode" placeholder="请选择所属应用" style="width: 100%">
+            <el-option 
+              v-for="app in apps" 
+              :key="app.appCode" 
+              :label="`${app.appCode} - ${app.appName}`" 
+              :value="app.appCode" 
+            />
+          </el-select>
+          <div style="color: #909399; font-size: 12px; margin-top: 5px;">
+            提示：代理必须属于一个应用，该应用的用户才能查看该代理上送的数据
+          </div>
+        </el-form-item>
         
         <el-form-item>
           <el-button 
@@ -181,6 +202,7 @@ export default {
   data() {
     return {
       agents: [],
+      apps: [],
       loading: false,
       dialogVisible: false,
       testing: false,
@@ -206,7 +228,8 @@ export default {
         id: '',
         name: '',
         ip: '',
-        port: 8080
+        port: 8080,
+        appCode: ''
       }
     }
   },
@@ -245,11 +268,12 @@ export default {
   },
   mounted() {
     this.loadAgents()
+    this.loadApps()
   },
   methods: {
     showAddDialog() {
       this.dialogVisible = true
-      this.newAgent = { id: '', name: '', ip: '', port: 8080 }
+      this.newAgent = { id: '', name: '', ip: '', port: 8080, appCode: '' }
       this.testResult = { show: false, type: 'info', message: '', success: false }
     },
     
@@ -352,8 +376,8 @@ export default {
     },
     
     async addAgent() {
-      if (!this.newAgent.id || !this.newAgent.name || !this.newAgent.ip || !this.newAgent.port) {
-        ElMessage.warning('请填写完整信息')
+      if (!this.newAgent.id || !this.newAgent.name || !this.newAgent.ip || !this.newAgent.port || !this.newAgent.appCode) {
+        ElMessage.warning('请填写完整信息（包括所属应用）')
         return
       }
       
@@ -373,7 +397,7 @@ export default {
           this.agents.push(agent)
           ElMessage.success('代理添加成功')
           this.dialogVisible = false
-          this.newAgent = { id: '', name: '', ip: '', port: 8080 }
+          this.newAgent = { id: '', name: '', ip: '', port: 8080, appCode: '' }
           this.testResult = { show: false, type: 'info', message: '', success: false }
           
           // Reload agents to get updated data
@@ -481,6 +505,23 @@ export default {
       } finally {
         this.pushingAll = false
       }
+    },
+    
+    async loadApps() {
+      try {
+        const response = await fetch('/api/apps/enabled')
+        const result = await response.json()
+        if (result.success) {
+          this.apps = result.data || []
+        }
+      } catch (error) {
+        console.error('Error loading apps:', error)
+      }
+    },
+    
+    getAppName(appCode) {
+      const app = this.apps.find(a => a.appCode === appCode)
+      return app ? `${appCode} - ${app.appName}` : appCode
     }
   }
 }

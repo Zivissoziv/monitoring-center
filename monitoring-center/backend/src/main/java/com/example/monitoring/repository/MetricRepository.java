@@ -28,4 +28,8 @@ public interface MetricRepository extends JpaRepository<Metric, Long> {
     // For alert checking
     List<Metric> findByAgentIdAndMetricTypeAndTimestampBetween(String agentId, String metricType, LocalDateTime startTime, LocalDateTime endTime);
     List<Metric> findByMetricTypeAndTimestampBetween(String metricType, LocalDateTime startTime, LocalDateTime endTime);
+    
+    // Filter by app code
+    Page<Metric> findByAppCodeInOrderByTimestampDesc(List<String> appCodes, Pageable pageable);
+    Page<Metric> findByAppCodeInAndAgentIdOrderByTimestampDesc(List<String> appCodes, String agentId, Pageable pageable);
 }
