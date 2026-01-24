@@ -55,4 +55,7 @@ public class ThirdPartyAlert {
     
     @Column(name = "source_ip", length = 50)
     private String sourceIp; // 来源IP
+    
+    @Column(name = "app_code", nullable = false, length = 10)
+    private String appCode; // 所属应用
 }

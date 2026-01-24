@@ -8,7 +8,8 @@ export const useUserStore = defineStore('user', {
     username: '',
     nickname: '',
     roles: [],
-    menus: []
+    menus: [],
+    apps: []
   }),
   
   getters: {
@@ -29,6 +30,7 @@ export const useUserStore = defineStore('user', {
           this.nickname = data.nickname
           this.roles = data.roles
           this.menus = data.menus
+          this.apps = data.apps || []
           
           localStorage.setItem('token', data.token)
           localStorage.setItem('user', JSON.stringify({
@@ -36,7 +38,8 @@ export const useUserStore = defineStore('user', {
             username: data.username,
             nickname: data.nickname,
             roles: data.roles,
-            menus: data.menus
+            menus: data.menus,
+            apps: data.apps || []
           }))
           
           return { success: true }
@@ -58,13 +61,15 @@ export const useUserStore = defineStore('user', {
           this.nickname = data.nickname
           this.roles = data.roles
           this.menus = data.menus
+          this.apps = data.apps || []
           
           localStorage.setItem('user', JSON.stringify({
             userId: data.userId,
             username: data.username,
             nickname: data.nickname,
             roles: data.roles,
-            menus: data.menus
+            menus: data.menus,
+            apps: data.apps || []
           }))
           
           return true
@@ -82,6 +87,7 @@ export const useUserStore = defineStore('user', {
       this.nickname = ''
       this.roles = []
       this.menus = []
+      this.apps = []
       
       localStorage.removeItem('token')
       localStorage.removeItem('user')
@@ -97,6 +103,7 @@ export const useUserStore = defineStore('user', {
           this.nickname = user.nickname
           this.roles = user.roles || []
           this.menus = user.menus || []
+          this.apps = user.apps || []
         } catch (e) {
           console.error('Failed to parse user from storage', e)
         }

@@ -28,4 +28,7 @@ public class ThirdPartyAlertRequest {
     private String alertStatus; // 告警状态：OPEN, CLOSED
     
     private String severity; // 告警等级：CRITICAL, WARNING, INFO（可选，默认WARNING）
+    
+    @NotBlank(message = "所属应用不能为空")
+    private String appCode; // 所属应用（必填）
 }

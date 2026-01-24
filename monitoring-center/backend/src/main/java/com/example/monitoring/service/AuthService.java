@@ -2,6 +2,7 @@ package com.example.monitoring.service;
 
 import com.example.monitoring.dto.LoginRequest;
 import com.example.monitoring.dto.LoginResponse;
+import com.example.monitoring.entity.SysApp;
 import com.example.monitoring.entity.SysMenu;
 import com.example.monitoring.entity.SysRole;
 import com.example.monitoring.entity.SysUser;
@@ -27,6 +28,7 @@ public class AuthService {
     private final SysUserRepository userRepository;
     private final SysRoleRepository roleRepository;
     private final SysMenuRepository menuRepository;
+    private final AppService appService;
     
     public LoginResponse login(LoginRequest request) {
         Authentication authentication = authenticationManager.authenticate(
@@ -41,6 +43,7 @@ public class AuthService {
         String token = jwtUtils.generateToken(user.getUsername(), user.getId());
         List<SysRole> roles = roleRepository.findRolesByUserId(user.getId());
         List<SysMenu> menus = menuRepository.findMenusByUserId(user.getId());
+        List<SysApp> apps = appService.getUserApps(user.getId());
         
         return LoginResponse.builder()
                 .token(token)
@@ -49,6 +52,7 @@ public class AuthService {
                 .nickname(user.getNickname())
                 .roles(roles)
                 .menus(menus)
+                .apps(apps)
                 .build();
     }
     
@@ -61,6 +65,7 @@ public class AuthService {
         
         List<SysRole> roles = roleRepository.findRolesByUserId(user.getId());
         List<SysMenu> menus = menuRepository.findMenusByUserId(user.getId());
+        List<SysApp> apps = appService.getUserApps(user.getId());
         
         return LoginResponse.builder()
                 .userId(user.getId())
@@ -68,6 +73,7 @@ public class AuthService {
                 .nickname(user.getNickname())
                 .roles(roles)
                 .menus(menus)
+                .apps(apps)
                 .build();
     }
 }

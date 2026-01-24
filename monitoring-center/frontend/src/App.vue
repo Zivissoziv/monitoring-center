@@ -79,7 +79,21 @@
               </span>
               <template #dropdown>
                 <el-dropdown-menu>
-                  <el-dropdown-item command="logout">
+                  <div class="user-dropdown-info">
+                    <div class="info-item">
+                      <span class="info-label">角色：</span>
+                      <span class="info-value">
+                        {{ userStore.roles.map(r => r.roleName).join('、') || '无' }}
+                      </span>
+                    </div>
+                    <div class="info-item">
+                      <span class="info-label">应用：</span>
+                      <span class="info-value">
+                        {{ userStore.apps.map(a => a.appName).join('、') || '无' }}
+                      </span>
+                    </div>
+                  </div>
+                  <el-dropdown-item command="logout" divided>
                     <el-icon><SwitchButton /></el-icon>
                     退出登录
                   </el-dropdown-item>
@@ -332,5 +346,31 @@ body {
 
 .el-menu--horizontal .el-menu .el-menu-item .el-icon {
   margin-right: 8px;
+}
+
+.user-dropdown-info {
+  padding: 12px 16px;
+  min-width: 180px;
+}
+
+.user-dropdown-info .info-item {
+  display: flex;
+  margin-bottom: 8px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.user-dropdown-info .info-item:last-child {
+  margin-bottom: 0;
+}
+
+.user-dropdown-info .info-label {
+  color: #909399;
+  flex-shrink: 0;
+}
+
+.user-dropdown-info .info-value {
+  color: #303133;
+  word-break: break-all;
 }
 </style>

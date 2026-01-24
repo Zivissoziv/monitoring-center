@@ -147,7 +147,8 @@ CREATE TABLE IF NOT EXISTS third_party_alerts (
     failure_reason VARCHAR(500),
     received_time TIMESTAMP NOT NULL,
     processed_time TIMESTAMP,
-    source_ip VARCHAR(50)
+    source_ip VARCHAR(50),
+    app_code VARCHAR(10) NOT NULL
 );
 
 -- ========================================
@@ -255,3 +256,4 @@ CREATE INDEX IF NOT EXISTS idx_sys_user_apps_app ON sys_user_apps(app_code);
 CREATE INDEX IF NOT EXISTS idx_agents_app_code ON agents(app_code);
 CREATE INDEX IF NOT EXISTS idx_metrics_app_code ON metrics(app_code);
 CREATE INDEX IF NOT EXISTS idx_alerts_app_code ON alerts(app_code);
+CREATE INDEX IF NOT EXISTS idx_third_party_alerts_app_code ON third_party_alerts(app_code);

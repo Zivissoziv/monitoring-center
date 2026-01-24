@@ -227,6 +227,16 @@
             <el-radio label="致命">致命</el-radio>
           </el-radio-group>
         </el-form-item>
+        <el-form-item label="所属应用" required>
+          <el-select v-model="mockForm.appCode" placeholder="请选择所属应用" style="width: 100%">
+            <el-option
+              v-for="app in apps"
+              :key="app.appCode"
+              :label="app.appName + ' (' + app.appCode + ')'"
+              :value="app.appCode"
+            />
+          </el-select>
+        </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="mockDialogVisible = false">取消</el-button>
@@ -255,6 +265,7 @@ export default {
       statistics: [],
       channels: [],
       channelAlerts: [],
+      apps: [],
       dialogVisible: false,
       alertsDialogVisible: false,
       mockDialogVisible: false,
@@ -273,7 +284,8 @@ export default {
         alertContent: '',
         externalAlertId: '',
         alertStatus: 'OPEN',
-        severity: '提醒'
+        severity: '提醒',
+        appCode: ''
       }
     }
   },
@@ -296,6 +308,7 @@ export default {
   mounted() {
     this.loadStatistics()
     this.loadChannels()
+    this.loadApps()
   },
   methods: {
     async loadStatistics() {
@@ -315,6 +328,16 @@ export default {
       } catch (error) {
         console.error('Error loading channels:', error)
         ElMessage.error('加载渠道列表失败')
+      }
+    },
+
+    async loadApps() {
+      try {
+        const response = await fetch('/api/apps')
+        const result = await response.json()
+        this.apps = result.data || []
+      } catch (error) {
+        console.error('Error loading apps:', error)
       }
     },
 
@@ -449,12 +472,13 @@ export default {
         alertContent: '',
         externalAlertId: '',
         alertStatus: 'OPEN',
-        severity: '提醒'
+        severity: '提醒',
+        appCode: this.apps.length > 0 ? this.apps[0].appCode : ''
       }
     },
 
     async sendMockAlert() {
-      if (!this.mockForm.channelCode || !this.mockForm.alertContent || !this.mockForm.externalAlertId) {
+      if (!this.mockForm.channelCode || !this.mockForm.alertContent || !this.mockForm.externalAlertId || !this.mockForm.appCode) {
         ElMessage.warning('请填写所有必填项')
         return
       }

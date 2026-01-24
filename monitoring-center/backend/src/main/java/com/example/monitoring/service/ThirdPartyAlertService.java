@@ -50,6 +50,7 @@ public class ThirdPartyAlertService {
         alert.setSeverity(parseSeverity(request.getSeverity()));
         alert.setReceivedTime(startTime);
         alert.setSourceIp(sourceIp);
+        alert.setAppCode(request.getAppCode());
         
         try {
             // 验证渠道是否存在且已启用
@@ -253,6 +254,7 @@ public class ThirdPartyAlertService {
                 alertMessage += "\n外部ID: " + request.getExternalAlertId();
                 alertMessage += "\n" + request.getAlertContent();
                 systemAlert.setAlertMessage(alertMessage);
+                systemAlert.setAppCode(request.getAppCode()); // 设置所属应用
                 
                 systemAlert.setStatus(AlertStatus.ACTIVE);
                 systemAlert.setFirstTriggeredAt(timestamp);
