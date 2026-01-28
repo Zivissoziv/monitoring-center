@@ -1,130 +1,82 @@
-# Monitoring Center
+# 监控中心 (Monitoring Center)
 
-A simple monitoring system with three components:
-1. Frontend (Vue.js)
-2. Backend (Spring Boot + MyBatis)
-3. Agent (Java)
+一个轻量级、开箱即用的分布式监控系统，帮助你实时掌握服务器运行状态。
 
-## Project Structure
+## 功能亮点
+
+- **多应用隔离** - 支持多应用数据隔离，不同团队独立管理
+- **实时监控** - CPU、内存等指标实时采集与可视化
+- **智能告警** - 灵活的告警规则配置，支持多级别告警
+- **应急知识库** - 告警关联处理方案，快速响应故障
+- **第三方接入** - 支持外部系统告警推送，统一告警管理
+- **权限管理** - 完善的 RBAC 权限体系
+- **深色模式** - 支持浅色/深色主题切换
+
+## 技术栈
+
+| 模块 | 技术 |
+|------|------|
+| 前端 | Vue 3 + Element Plus + Pinia |
+| 后端 | Spring Boot + JPA + Quartz |
+| 数据库 | H2（开发）/ MySQL（生产） |
+| 消息队列 | Kafka（可选） |
+| 代理 | Java 原生 HTTP Server |
+
+## 快速开始
+
+```bash
+# 启动后端
+cd backend && mvn spring-boot:run
+
+# 启动前端
+cd frontend && npm install && npm run dev
+
+# 打包代理
+cd agent && mvn clean package
+```
+
+访问 http://localhost:3000，默认账号：`admin / admin123`
+
+## 项目结构
 
 ```
 monitoring-center/
-├── backend/          # Spring Boot backend
-├── frontend/         # Vue.js frontend
-└── agent/            # Java agent
+├── backend/     # 后端服务
+├── frontend/    # 前端界面
+└── agent/       # 监控代理
 ```
 
-## Backend
+## 核心模块
 
-The backend is a Spring Boot application with:
-- Agent management module (CRUD operations for agents)
-- Metric collection module (store metrics from agents)
-- Alert module (define and check alert rules)
+| 模块 | 说明 |
+|------|------|
+| 监控台 | 告警概览、趋势图表、应急处理 |
+| 监控指标 | 指标查询、数据可视化 |
+| 告警中心 | 规则管理、知识库、第三方告警 |
+| 系统管理 | 代理、指标定义、应用、用户、角色 |
 
-### Running the Backend
+## 参与贡献
 
-```bash
-cd backend
-mvn spring-boot:run
-```
+我们欢迎各种形式的贡献！
 
-The backend will run on http://localhost:8080
+- **提交 Issue** - 反馈 Bug 或提出新功能建议
+- **提交 PR** - 修复问题或实现新特性
+- **完善文档** - 改进使用说明或翻译
+- **分享推广** - Star 项目或分享给更多人
 
-## Frontend
+### 贡献方向
 
-The frontend is a Vue.js application with:
-- Agent management UI
-- Metric visualization
-- Alert rule configuration
+- [ ] Dashboard 数据大屏
+- [ ] 更多指标类型支持
+- [ ] 告警通知渠道（邮件、钉钉、企微）
+- [ ] Docker 一键部署
+- [ ] 性能优化与压测
+- [ ] 单元测试覆盖
 
-### Running the Frontend
+## 开源协议
 
-```bash
-cd frontend
-npm install
-npm run dev
-```
+MIT License
 
-The frontend will run on http://localhost:3000
+---
 
-## Agent
-
-The agent is a Java application that:
-- Runs an embedded HTTP server
-- Responds to metric requests from the backend
-- Provides health check endpoint
-
-### Building the Agent
-
-```bash
-cd agent
-mvn clean package
-```
-
-This will create `target/monitoring-agent-1.0-SNAPSHOT.jar` - a standalone executable JAR.
-
-### Deploying the Agent
-
-1. Copy the following files to your target server:
-   - `target/monitoring-agent-1.0-SNAPSHOT.jar`
-   - `agent.properties.template` (rename to `agent.properties`)
-   - `start-agent.sh` (Linux/Mac) or `start-agent.bat` (Windows)
-   - `stop-agent.sh` (Linux/Mac) or `stop-agent.bat` (Windows)
-
-2. Edit `agent.properties` to configure:
-   - `agent.name`: Unique name for this agent
-   - `agent.port`: Port for the agent to listen on (default: 8081)
-
-3. Start the agent:
-   - **Linux/Mac**: `./start-agent.sh`
-   - **Windows**: `start-agent.bat`
-   - **Manual**: `java -jar monitoring-agent-1.0-SNAPSHOT.jar agent.properties`
-
-4. Stop the agent:
-   - **Linux/Mac**: `./stop-agent.sh`
-   - **Windows**: `stop-agent.bat`
-
-### Configuration
-
-The agent supports configuration via:
-1. External `agent.properties` file (recommended for production)
-2. Built-in default configuration
-3. Command-line argument: `java -jar monitoring-agent-1.0-SNAPSHOT.jar /path/to/config.properties`
-
-### API Endpoints
-
-- GET /health - Health check endpoint
-- GET /metrics - Get current CPU and memory metrics
-
-## Features
-
-1. **Agent Management**
-   - Add/remove agents
-   - View agent status
-
-2. **Metric Collection**
-   - Collect CPU and memory usage
-   - Store metrics in database
-
-3. **Alerting**
-   - Define alert rules based on metrics
-   - Check metrics against alert rules
-
-## API Endpoints
-
-### Agents
-- GET /api/agents - List all agents
-- POST /api/agents - Create a new agent
-- PUT /api/agents/{id} - Update an agent
-- DELETE /api/agents/{id} - Delete an agent
-
-### Metrics
-- GET /api/metrics - List all metrics
-- GET /api/metrics/agent/{agentId} - List metrics for an agent
-- POST /api/metrics - Save a metric
-
-### Alerts
-- GET /api/alerts/rules - List all alert rules
-- POST /api/alerts/rules - Create an alert rule
-- PUT /api/alerts/rules/{id} - Update an alert rule
-- DELETE /api/alerts/rules/{id} - Delete an alert rule
+**觉得有用？给个 Star 支持一下！**
