@@ -1,0 +1,17 @@
+# Monitoring Agent Configuration
+agent.name=Server1-Agent
+agent.port=8081
+
+# Agent Configuration
+# Unique name for this agent (default: MonitoringAgent-<hostname>)
+
+# Port for agent HTTP server
+
+# Kafka Configuration
+# Kafka bootstrap servers (comma-separated host:port)
+# Must match the Kafka cluster that backend is consuming from
+spring.kafka.bootstrap-servers=192.168.44.20:9092
+
+# Optional: Kafka producer serialization (usually keep default)
+#spring.kafka.producer.key-serializer=org.apache.kafka.common.serialization.StringSerializer
+#spring.kafka.producer.value-serializer=org.springframework.kafka.support.serializer.JsonSerializer
